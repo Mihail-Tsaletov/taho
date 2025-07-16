@@ -5,7 +5,7 @@
     <artifactId>taho</artifactId>
     <packaging>jar</packaging>
     <version>1.0-SNAPSHOT</version>
-    <name>taho Maven Webapp</name>
+    <name>taho</name>
     <url>http://maven.apache.org</url>
 
     <parent>
@@ -22,45 +22,15 @@
     </properties>
 
     <dependencies>
-        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-autoconfigure -->
+        <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-autoconfigure</artifactId>
-            <version>3.5.3</version>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-parent -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-parent</artifactId>
-            <version>3.2.2</version>
-            <type>pom</type>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.google.firebase/firebase-admin -->
-        <dependency>
-            <groupId>com.google.firebase</groupId>
-            <artifactId>firebase-admin</artifactId>
-            <version>8.1.0</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.19.0</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <version>3.5.3</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-webflux -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
-            <version>3.5.3</version>
-        </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -72,25 +42,33 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
+            <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
+
+        <!-- Thymeleaf Security Integration -->
         <dependency>
             <groupId>org.thymeleaf.extras</groupId>
             <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+        </dependency>
+
+        <!-- Firebase Admin SDK -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.3.0</version>
+        </dependency>
+
+        <!-- Jackson for JSON Parsing (Yandex API) -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
         </dependency>
     </dependencies>
 
