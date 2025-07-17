@@ -1,8 +1,12 @@
-package svaga.taho.config;
+package svaga.taho.firebase;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.FirestoreOptions;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.google.firebase.cloud.FirestoreClient;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,5 +36,18 @@ public class FirebaseConfig {
         FirebaseApp app = FirebaseApp.initializeApp(options);
         FirebaseConfig.log.info("Firebase initialized successfully");
         return app;
+    }
+
+    @Bean
+    public Firestore firestore(FirebaseApp firebaseApp) {
+        try{
+            Firestore firestore = FirestoreClient.getFirestore(firebaseApp);
+            log.info("Firestore initialized successfully");
+            return firestore;
+        }
+        catch (Exception e){
+            log.error("Firestore initialization failed", e);
+            throw new RuntimeException("Firestore initialization failed", e);
+        }
     }
 }
