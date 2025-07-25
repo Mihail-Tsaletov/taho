@@ -20,9 +20,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import svaga.taho.model.Role;
 import svaga.taho.service.UserService;
 
 import java.net.http.HttpResponse;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,6 +56,11 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Email, password and phone are required");
         }
 
+        if (!Arrays.toString(Role.values()).contains(role)) {
+            log.error("Invalid role: {}", role);
+            return ResponseEntity.badRequest().body("Role does not exist");
+        }
+
         try {
             UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
                     .setEmail(email)
@@ -62,15 +69,27 @@ public class AuthController {
             UserRecord user = firebaseAuth.createUser(createRequest);
             log.info("Created user with UID: {}", user.getUid());
 
-            DocumentReference docRef = firestore.collection("users").document(user.getUid());
+            DocumentReference userRef = firestore.collection("users").document(user.getUid());
             Map<String, Object> userData = Map.of(
                     "id", user.getUid(),
                     "email", email,
                     "name", name,
-                    "phoneNumber", phone,
-                    "role", role
+                    "phoneNumber", phone
             );
-            docRef.set(userData).get();
+
+            if ("driver".equals(role)) {
+                DocumentReference driverRef = firestore.collection("drivers").document(user.getUid());
+                Map<String, Object> driverData = Map.of(
+                        "driverId", user.getUid(),
+                        "name", name,
+                        "email", email,
+                        "phoneNumber", phone,
+                        "status", "OFFLINE"
+                );
+                driverRef.set(driverData).get();
+                log.info("Driver data saved to firestore with ID: {}", user.getUid());
+            }
+            userRef.set(userData).get();
             log.info("User data saved to firestore with ID: {}", user.getUid());
 
 

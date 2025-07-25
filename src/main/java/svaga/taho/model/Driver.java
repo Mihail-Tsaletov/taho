@@ -4,16 +4,17 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class Driver {
-    private Long driverId;
+    private String driverId;
     private String name;
+    private String email;
     private String phoneNumber;
-    private DriverStatus status;
+    private String status;
 
-    public Long getDriverId() {
+    public String getDriverId() {
         return driverId;
     }
 
-    public void setDriverId(Long driverId) {
+    public void setDriverId(String driverId) {
         this.driverId = driverId;
     }
 
@@ -33,11 +34,19 @@ public class Driver {
         this.phoneNumber = phoneNumber;
     }
 
-    public DriverStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(DriverStatus status) {
+    public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 }

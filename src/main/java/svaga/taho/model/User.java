@@ -5,19 +5,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class User {
     private String userId;
-    private String phoneNumber;
-    private String name;
     private String email;
-    private String role;
+    private String name;
+    private String phoneNumber;
 
     public User() {
     }
 
-    public User(String userId, String phoneNumber, String name, String role, String email) {
+    public User(String userId, String phoneNumber, String name, String email) {
         this.userId = userId;
         this.phoneNumber = phoneNumber;
         this.name = name;
-        this.role = role;
         this.email = email;
     }
 
@@ -27,14 +25,6 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
     }
 
     public String getPhoneNumber() {
