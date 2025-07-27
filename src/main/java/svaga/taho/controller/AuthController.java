@@ -77,7 +77,7 @@ public class AuthController {
                     "phoneNumber", phone
             );
 
-            if ("driver".equals(role)) {
+            if ("Driver".equals(role)) {
                 DocumentReference driverRef = firestore.collection("drivers").document(user.getUid());
                 Map<String, Object> driverData = Map.of(
                         "driverId", user.getUid(),

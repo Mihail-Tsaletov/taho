@@ -24,9 +24,9 @@ public class OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
     private final Firestore firestore = FirestoreClient.getFirestore();
 
-    public String createOrder(Order order) throws ExecutionException, InterruptedException {
+    public String createOrder(Order order, String uid) throws ExecutionException, InterruptedException {
         try {
-            String uid = SecurityContextHolder.getContext().getAuthentication().getName();
+            //String uid = SecurityContextHolder.getContext().getAuthentication().getName(); Пока коммент, передаем uid как аргумент
             if (uid == null) {
                 log.error("User authentication not found");
                 throw new IllegalStateException("User must be authenticated");
@@ -39,11 +39,11 @@ public class OrderService {
                 log.error("User {} does not exist", uid);
                 throw new IllegalStateException("User not found");
             }
-            String role = userDoc.getString("role");
-            if (!"client".equals(role)) {
+/*            String role = userDoc.getString("role");  Убрал роли, тк проверяем просто наличие пользователя в бд
+            if (!"Client".equals(role)) {
                 log.error("User {} is not a client", uid);
                 throw new IllegalStateException("User is not a client");
-            }
+            }*/
 
             //Валидация заказа
             if (order.getStartPoint() == null || order.getStartPoint().isEmpty() || order.getEndPoint() == null || order.getEndPoint().isEmpty()) {
@@ -72,9 +72,9 @@ public class OrderService {
         }
     }
 
-    public void acceptOrder(String orderId) throws ExecutionException, InterruptedException {
+    public void acceptOrder(String orderId, String uid) throws ExecutionException, InterruptedException {
         try {
-            String uid = SecurityContextHolder.getContext().getAuthentication().getName();
+            //String uid = SecurityContextHolder.getContext().getAuthentication().getName();
             if (uid == null) {
                 log.error("Driver authentication not found");
                 throw new IllegalStateException("Driver must be authenticated");
@@ -123,9 +123,9 @@ public class OrderService {
         }
     }
 
-    public void updateOrder(String orderId, String status) throws ExecutionException, InterruptedException {
+    public void updateOrder(String orderId, String status, String uid) throws ExecutionException, InterruptedException {
         try {
-            String uid = SecurityContextHolder.getContext().getAuthentication().getName();
+            //String uid = SecurityContextHolder.getContext().getAuthentication().getName();
             if (uid == null) {
                 log.error("No authenticated user found");
                 throw new IllegalStateException("User must be authenticated");
