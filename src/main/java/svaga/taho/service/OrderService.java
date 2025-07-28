@@ -1,11 +1,10 @@
 package svaga.taho.service;
 
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import svaga.taho.model.Driver;
@@ -15,6 +14,7 @@ import svaga.taho.model.OrderStatus;
 import com.google.cloud.Timestamp;
 
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -161,4 +161,55 @@ public class OrderService {
         }
     }
 
+    public List<Order> getOrders(String uid, String status, boolean isDriver) throws ExecutionException, InterruptedException {
+        try {
+            List<Order> orders = new ArrayList<>();
+            Query query;
+
+            if (isDriver && status != null && List.of("PENDING", "ASSIGNED").contains(status)) {
+                //Водитель запрашивает доступные заказы
+                query = firestore.collection("orders").whereEqualTo("status", status);
+            } else if (isDriver) {
+                //Водитель запрашивает свои заказы
+                query = firestore.collection("orders").whereEqualTo("driverId", uid);
+            } else {
+                //Клиент запрашивает свои заказы
+                query = firestore.collection("orders").whereEqualTo("clientId", uid);
+                if (status != null) {
+                    query = query.whereEqualTo("status", status);
+                }
+            }
+
+            QuerySnapshot querySnapshot = query.get().get();
+            for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                orders.add(doc.toObject(Order.class));
+            }
+            return orders;
+        } catch (Exception e) {
+            log.error("Failed to get orders: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    public Order getOrder(String uid, String orderId) throws ExecutionException, InterruptedException {
+        try {
+            DocumentReference orderRef = firestore.collection("orders").document(orderId);
+            DocumentSnapshot orderDoc = orderRef.get().get();
+
+            if (!orderDoc.exists()) {
+                log.error("Order {} does not exist", orderId);
+                throw new IllegalArgumentException("Order not found");
+            }
+
+            Order order = orderDoc.toObject(Order.class);
+            if(!uid.equals(order.getDriverId()) && !uid.equals(order.getClientId())) {
+                log.error("User {} is not authorized to view the order {}", uid, orderId);
+                throw new IllegalStateException("User is not authorized to view the order");
+            }
+            return order;
+        } catch (Exception e) {
+            log.error("Failed to get order: {}", e.getMessage());
+            throw e;
+        }
+    }
 }

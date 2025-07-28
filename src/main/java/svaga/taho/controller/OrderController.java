@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import svaga.taho.model.Order;
 import svaga.taho.service.OrderService;
 
+import java.util.List;
 import java.util.Map;
 /*
 POST /api/orders: Создание заказа (только для клиентов).
@@ -25,9 +26,11 @@ GET /api/orders/{id}: Получение информации о конкрет�
 public class OrderController {
     private final static Logger log = LoggerFactory.getLogger(OrderController.class);
     private final OrderService orderService;
+    private final Order order;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, Order order) {
         this.orderService = orderService;
+        this.order = order;
     }
 
     @PostMapping
@@ -75,6 +78,37 @@ public class OrderController {
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Error while updating order status: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Order>> getOrders(@RequestHeader("Authorization") String authHeader,
+                                                 @RequestBody Map<String, String> request) {
+        try {
+            String uid = decodeToken(authHeader);
+            String status = request.get("status");
+            boolean isDriver = Boolean.parseBoolean(request.get("isDriver"));
+
+            List<Order> orders = orderService.getOrders(uid, status, isDriver);
+            log.info("Get orders {}, for user: {}", orders.size(), uid);
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            log.error("Error while getting orders: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Order> getOrder(@RequestHeader("Authorization") String authHeader,
+                                          @PathVariable("id") String orderId) {
+        try {
+            String uid = decodeToken(authHeader);
+            Order order = orderService.getOrder(uid, orderId);
+            log.info("Get order with Id: {}, by user: {}", orderId, uid);
+            return ResponseEntity.ok(order);
+        } catch (Exception e) {
+            log.error("Error while getting order {}: {}", orderId, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }
