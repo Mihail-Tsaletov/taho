@@ -1,7 +1,7 @@
 package svaga.taho.model;
 
 public enum Role {
-    Client,
+    CLIENT,
     ADMIN,
-    Driver
+    DRIVER
 }

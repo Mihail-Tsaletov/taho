@@ -46,7 +46,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody Map<String, String> request) {
         String name = request.get("name");
-        String role = request.getOrDefault("role", "client");
+        String role = request.getOrDefault("role", "CLIENT");
         String phone = request.get("phone");
         String email = request.get("email");
         String password = request.get("password");
@@ -77,14 +77,14 @@ public class AuthController {
                     "phoneNumber", phone
             );
 
-            if ("Driver".equals(role)) {
+            if ("DRIVER".equals(role)) {
                 DocumentReference driverRef = firestore.collection("drivers").document(user.getUid());
                 Map<String, Object> driverData = Map.of(
                         "driverId", user.getUid(),
                         "name", name,
                         "email", email,
                         "phoneNumber", phone,
-                        "status", "OFFLINE"
+                        "status", "PENDING"
                 );
                 driverRef.set(driverData).get();
                 log.info("Driver data saved to firestore with ID: {}", user.getUid());

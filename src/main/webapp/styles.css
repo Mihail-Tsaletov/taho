@@ -1,0 +1,56 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f4f8; /* Мягкий светло-серый фон */
+    color: #333; /* Темно-серый текст */
+    margin: 0;
+    padding: 20px;
+}
+
+h1, h2 {
+    color: #555; /* Средне-серый для заголовков */
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.form-container, .block {
+    background-color: #e0f7fa; /* Светло-голубой для блоков */
+    border-radius: 10px; /* Закругленные углы */
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Легкая тень для объема */
+}
+
+.alternate-block {
+    background-color: #fff3e0; /* Бежевый для чередования цветов в разделах */
+}
+
+input, select, button {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fafafa; /* Светлый фон для полей */
+}
+
+button {
+    background-color: #81d4fa; /* Светло-голубой для кнопок */
+    color: #333;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #4fc3f7;
+}
+
+.flex-container {
+    display: flex;
+    justify-content: space-between;
+}
+
+.left, .right {
+    width: 48%;
+}

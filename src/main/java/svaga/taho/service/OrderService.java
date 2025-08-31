@@ -74,7 +74,6 @@ public class OrderService {
 
     public void acceptOrder(String orderId, String uid) throws ExecutionException, InterruptedException {
         try {
-            //String uid = SecurityContextHolder.getContext().getAuthentication().getName();
             if (uid == null) {
                 log.error("Driver authentication not found");
                 throw new IllegalStateException("Driver must be authenticated");
@@ -125,7 +124,6 @@ public class OrderService {
 
     public void updateOrder(String orderId, String status, String uid) throws ExecutionException, InterruptedException {
         try {
-            //String uid = SecurityContextHolder.getContext().getAuthentication().getName();
             if (uid == null) {
                 log.error("No authenticated user found");
                 throw new IllegalStateException("User must be authenticated");
