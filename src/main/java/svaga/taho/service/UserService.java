@@ -1,15 +1,20 @@
 package svaga.taho.service;
 
 import com.google.cloud.firestore.DocumentReference;
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.QuerySnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import svaga.taho.model.Driver;
 import svaga.taho.model.Manager;
 import svaga.taho.model.User;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -58,6 +63,26 @@ public class UserService {
             return manager.getManagerId();
         } catch (Exception e) {
             log.error("Failed to create manager {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    public List<Driver> getFirstFiveDrivers() throws ExecutionException, InterruptedException {
+        try {
+            List<Driver> drivers = new ArrayList<>();
+
+            QuerySnapshot query = firestore.collection("drivers")
+                    .whereEqualTo("status", "AVAILABLE")
+                    .limit(5)
+                    .get().get();
+
+            for(DocumentSnapshot document : query.getDocuments()) {
+                drivers.add(document.toObject(Driver.class));
+            }
+            return drivers;
+
+        } catch (Exception e){
+            log.error("Failed to get first five drivers {}", e.getMessage());
             throw e;
         }
     }

@@ -104,7 +104,7 @@ public class OrderController {
                                           @PathVariable("id") String orderId) {
         try {
             String uid = decodeToken(authHeader);
-            Order order = orderService.getOrder(uid, orderId);
+            Order order = orderService.getCurrentOrder(uid, orderId);
             log.info("Get order with Id: {}, by user: {}", orderId, uid);
             return ResponseEntity.ok(order);
         } catch (Exception e) {

@@ -4,8 +4,6 @@ import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import svaga.taho.model.Driver;
 import svaga.taho.model.DriverStatus;
@@ -189,7 +187,9 @@ public class OrderService {
         }
     }
 
-    public Order getOrder(String uid, String orderId) throws ExecutionException, InterruptedException {
+    //TO-DO:
+    //тут какая-то хуйня, надо убрать проверку на uid, потому что манагеры так не смогут брать
+    public Order getCurrentOrder(String uid, String orderId) throws ExecutionException, InterruptedException {
         try {
             DocumentReference orderRef = firestore.collection("orders").document(orderId);
             DocumentSnapshot orderDoc = orderRef.get().get();
@@ -200,7 +200,7 @@ public class OrderService {
             }
 
             Order order = orderDoc.toObject(Order.class);
-            if(!uid.equals(order.getDriverId()) && !uid.equals(order.getClientId())) {
+            if (!uid.equals(order.getDriverId()) && !uid.equals(order.getClientId())) {
                 log.error("User {} is not authorized to view the order {}", uid, orderId);
                 throw new IllegalStateException("User is not authorized to view the order");
             }
@@ -210,4 +210,27 @@ public class OrderService {
             throw e;
         }
     }
+
+    public List<Order> getOrdersWithStatus(String status) throws ExecutionException, InterruptedException {
+        try {
+            if (!Arrays.toString(OrderStatus.values()).contains(status)) {
+                log.error("Invalid status {}", status);
+                throw new IllegalArgumentException("Invalid status");
+            }
+
+            List<Order> orders = new ArrayList<>();
+            QuerySnapshot query = firestore.collection("orders").whereEqualTo("status", status).get().get();
+
+            for (DocumentSnapshot doc : query.getDocuments()) {
+                orders.add(doc.toObject(Order.class));
+            }
+
+            return orders;
+
+        } catch (Exception e) {
+            log.error("Failed to get active orders: {}", e.getMessage());
+            throw e;
+        }
+    }
+
 }

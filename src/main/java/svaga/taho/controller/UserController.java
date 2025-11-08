@@ -98,4 +98,6 @@ public class UserController {
         log.info("Manager {} approved", resId);
         return ResponseEntity.ok().build();
     }
+
+
 }
