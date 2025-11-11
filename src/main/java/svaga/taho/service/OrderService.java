@@ -211,6 +211,7 @@ public class OrderService {
         }
     }
 
+
     public List<Order> getOrdersWithStatus(String status) throws ExecutionException, InterruptedException {
         try {
             if (!Arrays.toString(OrderStatus.values()).contains(status)) {
@@ -224,7 +225,7 @@ public class OrderService {
             for (DocumentSnapshot doc : query.getDocuments()) {
                 orders.add(doc.toObject(Order.class));
             }
-
+            log.info("Orders {}", orders.toString());
             return orders;
 
         } catch (Exception e) {

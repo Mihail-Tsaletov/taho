@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Назначение заказов</title>
+  <link rel="stylesheet" th:href="@{/css/styles.css}">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f7f7f7; }
+    .container { padding: 20px; max-width: 900px; margin: 0 auto; }
+    h1 { color: #333; }
+    .order-card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .order-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    #loading { text-align: center; color: #666; padding: 40px; font-size: 1.2em; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Новые заказы <span id="counter" style="color:#28a745"></span></h1>
+
+  <div id="loading">Загрузка заказов...</div>
+  <div id="ordersList"></div>
+</div>
+
+<script th:inline="javascript">
+  const STATUS = "PENDING";
+
+  function loadOrders() {
+    fetch(`/api/orders/getOrdersWithStatus?status=${STATUS}`)
+            .then(r => r.json())
+            .then(orders => {
+              const list = document.getElementById('ordersList');
+              const counter = document.getElementById('counter');
+              document.getElementById('loading').style.display = 'none';
+              counter.textContent = `(${orders.length})`;
+
+              if (orders.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#888;padding:40px;">Нет новых заказов</p>';
+                return;
+              }
+
+              list.innerHTML = orders.map(order => {
+                // Преобразуем Timestamp → нормальную дату
+                const orderDate = order.orderTime
+                        ? new Date(order.orderTime.seconds * 1000).toLocaleString('ru-RU')
+                        : '—';
+
+                return `
+                        <div class="order-card">
+                            <strong>Заказ #${order.orderId || '—'}</strong><br>
+                            <small>Создан: ${orderDate}</small><br><br>
+                            Откуда: <strong>${order.startPoint || '—'}</strong><br>
+                            Куда: <strong>${order.endPoint || '—'}</strong><br>
+                            В пределах города: <strong>${order.isWithinCity ? 'Да' : 'Нет'}</strong><br>
+                            Цена: <strong>${order.price || 0} ₽</strong>
+                            <br><br>
+                            <small>Статус: ${order.status || '—'}</small>
+                        </div>
+                    `;
+              }).join('');
+            })
+            .catch(err => {
+              console.error(err);
+              document.getElementById('ordersList').innerHTML = '<p style="color:red">Ошибка загрузки</p>';
+            });
+  }
+
+  // Загружаем сразу и каждые 10 секунд
+  loadOrders();
+  setInterval(loadOrders, 10000);
+</script>
+
+</body>
+</html>

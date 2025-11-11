@@ -16,8 +16,8 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/firebase/test").permitAll()
-                        .requestMatchers("api/**").authenticated()
+                        .requestMatchers("/firebase/test", "/manager").permitAll()
+                        .requestMatchers("api/**").permitAll()
                         .anyRequest().permitAll())
                 .addFilterBefore(new FirebaseAuthFilter(), UsernamePasswordAuthenticationFilter.class);
 

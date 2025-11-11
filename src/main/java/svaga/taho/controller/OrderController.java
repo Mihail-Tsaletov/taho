@@ -13,6 +13,7 @@ import svaga.taho.service.OrderService;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 /*
 POST /api/orders: Создание заказа (только для клиентов).
 PUT /api/orders/{id}/accept: Принятие заказа водителем.
@@ -47,6 +48,8 @@ public class OrderController {
         }
     }
 
+
+    //Принятие заказа ВОДИТЕЛЕМ
     @PostMapping("/{id}/accept")
     public ResponseEntity<Void> acceptOrder(@RequestHeader("Authorization") String authHeader,
                                             @PathVariable("id") String orderId) {
@@ -61,6 +64,7 @@ public class OrderController {
         }
     }
 
+    //Обновление статуса заказа
     @PutMapping("/{id}/updateStatus")
     public ResponseEntity<Void> updateOrderStatus(@RequestHeader("Authorization") String authHeader,
                                                   @PathVariable("id") String orderId,
@@ -111,6 +115,12 @@ public class OrderController {
             log.error("Error while getting order {}: {}", orderId, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
+    }
+
+    @GetMapping({"/getOrdersWithStatus"})
+    @ResponseBody
+    public List<Order> getOrdersWithStatus(@RequestParam String status) throws ExecutionException, InterruptedException {
+        return orderService.getOrdersWithStatus(status);
     }
 
     private String decodeToken(String authHeader) throws Exception {

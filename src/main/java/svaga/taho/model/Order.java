@@ -123,4 +123,23 @@ public class Order {
     public void setDriverId(String driverId) {
         this.driverId = driverId;
     }
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "orderId='" + orderId + '\'' +
+                ", clientId='" + clientId + '\'' +
+                ", driverId='" + driverId + '\'' +
+                ", startPoint='" + startPoint + '\'' +
+                ", endPoint='" + endPoint + '\'' +
+                ", isWithinCity=" + isWithinCity +
+                ", status='" + status + '\'' +
+                ", orderTime=" + orderTime +
+                ", assignedTime=" + assignedTime +
+                ", acceptanceTime=" + acceptanceTime +
+                ", pickupTime=" + pickupTime +
+                ", dropOffTime=" + dropOffTime +
+                ", price=" + price +
+                '}';
+    }
 }
