@@ -77,7 +77,7 @@ public class OrderController {
                 return ResponseEntity.badRequest().body(null);
             }
 
-            orderService.updateOrder(orderId, status, uid);
+            orderService.updateOrder(orderId, status);
             log.info("Updated order with Id: {} to status {}, by user: {}", orderId, status, uid);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -86,6 +86,7 @@ public class OrderController {
         }
     }
 
+    //тупое получение заказов
     @GetMapping
     public ResponseEntity<List<Order>> getOrders(@RequestHeader("Authorization") String authHeader,
                                                  @RequestBody Map<String, String> request) {
@@ -103,12 +104,13 @@ public class OrderController {
         }
     }
 
+    //получение конкретного заказа
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrder(@RequestHeader("Authorization") String authHeader,
                                           @PathVariable("id") String orderId) {
         try {
             String uid = decodeToken(authHeader);
-            Order order = orderService.getCurrentOrder(uid, orderId);
+            Order order = orderService.getCurrentOrder(orderId);
             log.info("Get order with Id: {}, by user: {}", orderId, uid);
             return ResponseEntity.ok(order);
         } catch (Exception e) {
@@ -117,10 +119,26 @@ public class OrderController {
         }
     }
 
-    @GetMapping({"/getOrdersWithStatus"})
+    //получение заказов с конкретным статусом
+    @GetMapping("/getOrdersWithStatus")
     @ResponseBody
     public List<Order> getOrdersWithStatus(@RequestParam String status) throws ExecutionException, InterruptedException {
         return orderService.getOrdersWithStatus(status);
+    }
+
+    @PostMapping("/putDriverInOrder")
+    public ResponseEntity<Void> putDriverInOrder(@RequestBody Map<String, String> request) throws Exception {
+        try {
+            String driverId = request.get("driverId");
+            String orderId = request.get("orderId");
+
+            orderService.putDriverInOrder(driverId,orderId);
+            log.info("Put driver {} in order with Id: {}",driverId, orderId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Can't put driver {} in order {} , exception: {}", request.get("driverId"), request.get("orderId"),  e.getMessage());
+            throw e;
+        }
     }
 
     private String decodeToken(String authHeader) throws Exception {

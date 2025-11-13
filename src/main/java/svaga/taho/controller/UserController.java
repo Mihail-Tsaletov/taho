@@ -10,9 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import svaga.taho.model.Driver;
 import svaga.taho.model.User;
 import svaga.taho.service.UserService;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -99,5 +101,27 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
+    //Возвращает максимум 5 свободных водителей
+    @GetMapping("/getAvailableDrivers")
+    @ResponseBody
+    public List<Driver> getAvailableDrivers() throws ExecutionException, InterruptedException {
+        try {
+            return userService.getFirstFiveDrivers();
+        } catch (Exception e) {
+            log.error("Can't get available drivers, exception: {}", e.getMessage());
+            throw e;
+        }
 
+    }
+
+    private String decodeToken(String authHeader) throws Exception {
+        try {
+            String idToken = authHeader.replace("Bearer ", "");
+            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
+            return decodedToken.getUid();
+        } catch (Exception e) {
+            log.error("Can't decode header: {}, exception: {}", authHeader, e.getMessage());
+            throw e;
+        }
+    }
 }

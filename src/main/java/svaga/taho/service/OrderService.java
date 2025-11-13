@@ -120,13 +120,8 @@ public class OrderService {
         }
     }
 
-    public void updateOrder(String orderId, String status, String uid) throws ExecutionException, InterruptedException {
+    public void updateOrder(String orderId, String status) throws ExecutionException, InterruptedException {
         try {
-            if (uid == null) {
-                log.error("No authenticated user found");
-                throw new IllegalStateException("User must be authenticated");
-            }
-
             DocumentReference orderRef = firestore.collection("orders").document(orderId);
             DocumentSnapshot orderDoc = orderRef.get().get();
             if (!orderDoc.exists()) {
@@ -189,7 +184,7 @@ public class OrderService {
 
     //TO-DO:
     //тут какая-то хуйня, надо убрать проверку на uid, потому что манагеры так не смогут брать
-    public Order getCurrentOrder(String uid, String orderId) throws ExecutionException, InterruptedException {
+    public Order getCurrentOrder(String orderId) throws ExecutionException, InterruptedException {
         try {
             DocumentReference orderRef = firestore.collection("orders").document(orderId);
             DocumentSnapshot orderDoc = orderRef.get().get();
@@ -199,12 +194,11 @@ public class OrderService {
                 throw new IllegalArgumentException("Order not found");
             }
 
-            Order order = orderDoc.toObject(Order.class);
-            if (!uid.equals(order.getDriverId()) && !uid.equals(order.getClientId())) {
+            /*            if (!uid.equals(order.getDriverId()) && !uid.equals(order.getClientId())) {
                 log.error("User {} is not authorized to view the order {}", uid, orderId);
                 throw new IllegalStateException("User is not authorized to view the order");
-            }
-            return order;
+            }*/
+            return orderDoc.toObject(Order.class);
         } catch (Exception e) {
             log.error("Failed to get order: {}", e.getMessage());
             throw e;
@@ -225,11 +219,46 @@ public class OrderService {
             for (DocumentSnapshot doc : query.getDocuments()) {
                 orders.add(doc.toObject(Order.class));
             }
-            log.info("Orders {}", orders.toString());
+            //log.info("Orders {}", orders.toString());
             return orders;
 
         } catch (Exception e) {
             log.error("Failed to get active orders: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    public void putDriverInOrder(String driverId, String orderId) throws ExecutionException, InterruptedException {
+        try {
+            //Проверка на существование заказа
+            DocumentReference orderRef = firestore.collection("orders").document(orderId);
+            DocumentSnapshot orderDoc = orderRef.get().get();
+            if (!orderDoc.exists()) {
+                log.error("Order {} does not exist", orderId);
+                throw new IllegalArgumentException("Order not found");
+            }
+
+            //Проверка на существование водителя и его статус
+            DocumentReference driverRef = firestore.collection("drivers").document(driverId);
+            DocumentSnapshot driverDoc = driverRef.get().get();
+            if (!driverDoc.exists() || !driverDoc.getString("status").equals(DriverStatus.AVAILABLE.toString())) {
+                log.error("Order {} does not exist or driver is not available", driverId);
+                throw new IllegalArgumentException("Order not found");
+            }
+
+            // Меняем статус водителя
+            driverRef.update("status", DriverStatus.ASSIGNED.toString()).get();
+
+            // Один раз — правильно обновляем заказ
+            firestore.runTransaction(transaction -> {
+                transaction.update(orderRef, "status", OrderStatus.ASSIGNED.toString());
+                transaction.update(orderRef, "assignedTime", Timestamp.now());
+                return null;
+            }).get();
+
+            log.info("Driver {} successfully assigned to order {}", driverId, orderId);
+        } catch (Exception e) {
+            log.error("Failed to put driver {} in order {} error: {}", driverId, orderId, e.getMessage());
             throw e;
         }
     }
