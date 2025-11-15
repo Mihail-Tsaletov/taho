@@ -31,11 +31,6 @@ public class UserController {
         this.firestore = firestore;
     }
 
-    public ResponseEntity<String> createUser(@RequestBody User user) throws ExecutionException, InterruptedException {
-        String userId = userService.createUser(user);
-        return ResponseEntity.ok(userId);
-    }
-
     @PostMapping("/approveDriver")
     public ResponseEntity<String> approveDriverRole(@RequestHeader("Authorization") String authHeader,
                                                 @RequestBody Map<String, String> request) throws Exception{

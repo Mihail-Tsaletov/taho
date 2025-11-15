@@ -1,52 +1,24 @@
 package svaga.taho.model;
 
+import jakarta.persistence.*;
+import lombok.Data;
 import org.springframework.stereotype.Component;
 
-@Component
+@Entity
+@Table(name = "drivers")
+@Data
 public class Driver {
+    @Id
+    @Column(name = "driver_id", length = 50)
     private String driverId;
-    private String name;
+
+    @Column(name = "user_id", length = 50, unique = true)
+    private String userId;
+
     private String email;
+    private String name;
     private String phoneNumber;
-    private String status;
 
-    public String getDriverId() {
-        return driverId;
-    }
-
-    public void setDriverId(String driverId) {
-        this.driverId = driverId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    @Enumerated(EnumType.STRING)
+    private DriverStatus status = DriverStatus.PENDING;
 }

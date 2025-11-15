@@ -86,7 +86,7 @@ public class OrderController {
         }
     }
 
-    //тупое получение заказов
+/*    //тупое получение заказов
     @GetMapping
     public ResponseEntity<List<Order>> getOrders(@RequestHeader("Authorization") String authHeader,
                                                  @RequestBody Map<String, String> request) {
@@ -102,7 +102,7 @@ public class OrderController {
             log.error("Error while getting orders: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
-    }
+    }*/
 
     //получение конкретного заказа
     @GetMapping("/{id}")

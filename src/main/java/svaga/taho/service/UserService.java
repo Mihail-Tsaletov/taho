@@ -2,16 +2,22 @@ package svaga.taho.service;
 
 import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QuerySnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import svaga.taho.DTO.RegisterRequest;
 import svaga.taho.model.Driver;
+import svaga.taho.model.DriverStatus;
 import svaga.taho.model.Manager;
 import svaga.taho.model.User;
+import svaga.taho.repository.IDriverRepository;
+import svaga.taho.repository.IManagerRepository;
+import svaga.taho.repository.IOrderRepository;
+import svaga.taho.repository.IUserRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,45 +26,56 @@ import java.util.concurrent.ExecutionException;
 @Service
 public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
-    private final Firestore firestore;
+    @Autowired
+    private IUserRepository userRepository;
+    @Autowired
+    private IOrderRepository orderRepository;
+    @Autowired
+    private IManagerRepository managerRepository;
+    @Autowired
+    private IDriverRepository driverRepository;
 
-    public UserService(Firestore firestore) {
-        this.firestore = firestore;
-    }
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
-    public String createUser(User user) throws ExecutionException, InterruptedException {
-        try {
-            String uid = SecurityContextHolder.getContext().getAuthentication().getName();
-            if (uid == null) {
-                log.error("No authentication user found in context");
-                throw new IllegalStateException("User must be authenticated");
-            }
-            DocumentReference docRef = firestore.collection("users").document(uid);
-            user.setUserId(uid);
-            docRef.set(user).get();
-            log.info("User created with id {}", uid);
-            return user.getUserId();
-        } catch (Exception e) {
-            log.error("Failed to create user {}", e.getMessage());
-            throw e;
+    public User register(RegisterRequest request) {
+        if (userRepository.existsByPhone(request.getPhone())) {
+            throw new RuntimeException("Пользователь с таким номером уже существует");  // TO:DO сделать проверку на роль водителя,
+            // чтоб если уже есть юзер, то можно было
+            //зарегать к этой же учетке водилу
         }
+
+        User user = new User();
+        user.setPhone(request.getPhone());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setName(request.getName());
+        user.setRole(request.getRole());
+
+        return userRepository.save(user);
     }
 
-    public String createManager(String uid) throws ExecutionException, InterruptedException {
+    public User findByPhone(String phone) {
+        return userRepository.findByPhone(phone)
+                .orElseThrow(() ->{
+                    log.error("User with phone number {} dont find", phone);
+                    return new RuntimeException();
+                });
+    }
+
+    public String createManager(String uid){
         try {
             String approvedManagerUid = SecurityContextHolder.getContext().getAuthentication().getName();
-            DocumentReference docRef = firestore.collection("users").document(uid);
-            if (!docRef.get().get().exists()) {
+            User user = userRepository.findById(uid).orElseThrow(() -> {
                 log.error("User {} does not exist", uid);
-                throw new IllegalStateException("User does not exist");
-            }
+                return new IllegalStateException();
+            });
+
 
             Manager manager = new Manager();
             manager.setManagerId("MG" + uid);
-            manager.setUid(uid);
+            manager.setUserId(uid);
             manager.setApprovedManagerUid(approvedManagerUid);
-            DocumentReference managerRef = firestore.collection("managers").document(manager.getManagerId());
-            managerRef.set(manager).get();
+            managerRepository.save(manager);
             log.info("Manager created with id {}, id of creator {}", uid, manager.getApprovedManagerUid());
             return manager.getManagerId();
         } catch (Exception e) {
@@ -67,21 +84,10 @@ public class UserService {
         }
     }
 
-    public List<Driver> getFirstFiveDrivers() throws ExecutionException, InterruptedException {
+    public List<Driver> getFirstFiveDrivers(){
         try {
-            List<Driver> drivers = new ArrayList<>();
-
-            QuerySnapshot query = firestore.collection("drivers")
-                    .whereEqualTo("status", "AVAILABLE")
-                    .limit(5)
-                    .get().get();
-
-            for(DocumentSnapshot document : query.getDocuments()) {
-                drivers.add(document.toObject(Driver.class));
-            }
-            return drivers;
-
-        } catch (Exception e){
+            return driverRepository.findTop5ByStatus(DriverStatus.AVAILABLE);
+        } catch (Exception e) {
             log.error("Failed to get first five drivers {}", e.getMessage());
             throw e;
         }

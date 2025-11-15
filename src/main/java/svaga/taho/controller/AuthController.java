@@ -1,159 +1,77 @@
+// src/main/java/svaga/taho/controller/AuthController.java
 package svaga.taho.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.Firestore;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.UserRecord;
-import com.google.gson.JsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-import svaga.taho.model.Role;
+import svaga.taho.DTO.LoginRequest;
+import svaga.taho.DTO.RegisterRequest;
+import svaga.taho.model.User;
+import svaga.taho.model.UserRole;
+import svaga.taho.service.JwtService;
 import svaga.taho.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
 
-import java.net.http.HttpResponse;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 
-@Controller
-@RequestMapping("/auth")
+@RestController
+@RequestMapping("/api/auth")
 public class AuthController {
     private final static Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
-    private FirebaseAuth firebaseAuth;
-    @Autowired
-    private Firestore firestore;
+    private UserService userService;
 
-    @Value("${web.api.key}")
-    private String WEB_API_KEY;
     @Autowired
-    private ObjectMapper objectMapper;
+    private JwtService jwtService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody Map<String, String> request) {
-        String name = request.get("name");
-        String role = request.getOrDefault("role", "CLIENT");
-        String phone = request.get("phone");
-        String email = request.get("email");
-        String password = request.get("password");
-
-        if (email == null || email.isEmpty() || password == null || password.isEmpty() || phone == null || phone.isEmpty()) {
-            log.error("Missing required fields: email, password or phone");
-            return ResponseEntity.badRequest().body("Email, password and phone are required");
-        }
-
-        if (!Arrays.toString(Role.values()).contains(role)) {
-            log.error("Invalid role: {}", role);
-            return ResponseEntity.badRequest().body("Role does not exist");
-        }
-
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            UserRecord.CreateRequest createRequest = new UserRecord.CreateRequest()
-                    .setEmail(email)
-                    .setPassword(password)
-                    .setPhoneNumber(phone);
-            UserRecord user = firebaseAuth.createUser(createRequest);
-            log.info("Created user with UID: {}", user.getUid());
-
-            DocumentReference userRef = firestore.collection("users").document(user.getUid());
-            Map<String, Object> userData = Map.of(
-                    "id", user.getUid(),
-                    "email", email,
-                    "name", name,
-                    "phoneNumber", phone
-            );
-
-            if ("DRIVER".equals(role)) {
-                DocumentReference driverRef = firestore.collection("drivers").document(user.getUid());
-                Map<String, Object> driverData = Map.of(
-                        "driverId", user.getUid(),
-                        "name", name,
-                        "email", email,
-                        "phoneNumber", phone,
-                        "status", "PENDING"
-                );
-                driverRef.set(driverData).get();
-                log.info("Driver data saved to firestore with ID: {}", user.getUid());
-            }
-            userRef.set(userData).get();
-            log.info("User data saved to firestore with ID: {}", user.getUid());
-
-
-            String url = String.format("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=%s", WEB_API_KEY);
-            String payload = String.format("{\"email\": \"%s\", \"password\": \"%s\", \"returnSecureToken\": true}",
-                    email, password);
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .build();
-            HttpResponse<String> response = HttpClient.newHttpClient().send(httpRequest,
-                    HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                JsonNode jsonResponse = objectMapper.readTree(response.body());
-                String idToken = jsonResponse.get("idToken").asText();
-                log.info("IDToken generated for user: {}", email);
-                return ResponseEntity.ok(idToken);
-            } else {
-                log.error("Failed to generate IDToken: {}", response.body());
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Failed to generate IDToken");
+            // По умолчанию — CLIENT
+            if (request.getRole() == null) {
+                request.setRole(UserRole.CLIENT);
             }
 
+            User user = userService.register(request);
+            String token = jwtService.generateToken(user.getPhone(), user.getRole().toString());
+
+            log.info("User registered successful: " + user.getPhone());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Registration successful!",
+                    "token", token,
+                    "role", user.getRole()
+            ));
         } catch (Exception e) {
-            log.error("Registration failed", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Registration failed" + e.getMessage());
+            log.error("Can't register user {}", request.getPhone());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        String password = request.get("password");
-
-        if (email == null || email.isEmpty() || password == null || password.isEmpty()) {
-            log.error("Missing required fields: email, password");
-            return ResponseEntity.badRequest().body("Email, password and phone are required");
-        }
-
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            String url = String.format("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=%s", WEB_API_KEY);
-            String payload = String.format("{\"email\": \"%s\", \"password\": \"%s\", \"returnSecureToken\": true}",
-                    email, password);
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .build();
-            HttpResponse<String> response = HttpClient.newHttpClient().send(httpRequest,
-                    HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                JsonNode jsonResponse = objectMapper.readTree(response.body());
-                String idToken = jsonResponse.get("idToken").asText();
-                log.info("User logged with email: {}", email);
-                return ResponseEntity.ok(idToken);
-            } else {
-                log.error("Login failed: {}", response.body());
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login failed");
+            User user = userService.findByPhone(request.getPhone());
+            if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+                return ResponseEntity.status(401).body(Map.of("error", "Incorrect password!"));
             }
+
+            String token = jwtService.generateToken(user.getPhone(), user.getRole().toString());
+
+            log.info("User login successful: {} token: {}",user.getPhone(), token);
+            return ResponseEntity.ok(Map.of(
+                    "token", token,
+                    "role", user.getRole(),
+                    "name", user.getName()
+            ));
         } catch (Exception e) {
-            log.error("Login failed", e);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login failed" + e.getMessage());
+            log.error("Can't login user {}", request.getPhone());
+            return ResponseEntity.status(401).body(Map.of("error", "Пользователь не найден"));
         }
     }
 }

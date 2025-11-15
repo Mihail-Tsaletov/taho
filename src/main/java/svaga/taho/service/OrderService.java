@@ -4,12 +4,14 @@ import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import svaga.taho.model.Driver;
-import svaga.taho.model.DriverStatus;
-import svaga.taho.model.Order;
-import svaga.taho.model.OrderStatus;
-import com.google.cloud.Timestamp;
+import svaga.taho.model.*;
+import svaga.taho.repository.IDriverRepository;
+import svaga.taho.repository.IOrderRepository;
+import svaga.taho.repository.IUserRepository;
+
+import java.time.LocalDateTime;
 
 
 import java.util.ArrayList;
@@ -20,7 +22,12 @@ import java.util.concurrent.ExecutionException;
 @Service
 public class OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
-    private final Firestore firestore = FirestoreClient.getFirestore();
+    @Autowired
+    private IUserRepository userRepository;
+    @Autowired
+    private IOrderRepository orderRepository;
+    @Autowired
+    private IDriverRepository driverRepository;
 
     public String createOrder(Order order, String uid) throws ExecutionException, InterruptedException {
         try {
@@ -30,18 +37,11 @@ public class OrderService {
                 throw new IllegalStateException("User must be authenticated");
             }
 
-            //Проверка роли
-            DocumentReference userRef = firestore.collection("users").document(uid);
-            DocumentSnapshot userDoc = userRef.get().get();
-            if (!userDoc.exists()) {
+            //Проверка существования юзера
+            User user = userRepository.findById(uid).orElseThrow(() -> {
                 log.error("User {} does not exist", uid);
-                throw new IllegalStateException("User not found");
-            }
-/*            String role = userDoc.getString("role");  Убрал роли, тк проверяем просто наличие пользователя в бд
-            if (!"Client".equals(role)) {
-                log.error("User {} is not a client", uid);
-                throw new IllegalStateException("User is not a client");
-            }*/
+                return new IllegalStateException("User not found");
+            });
 
             //Валидация заказа
             if (order.getStartPoint() == null || order.getStartPoint().isEmpty() || order.getEndPoint() == null || order.getEndPoint().isEmpty()) {
@@ -51,17 +51,15 @@ public class OrderService {
 
             //Создание заказа
             order.setClientId(uid);
-            order.setStatus(OrderStatus.PENDING.toString());
-            order.setOrderTime(Timestamp.now());
+            order.setStatus(OrderStatus.PENDING);
+            order.setOrderTime(LocalDateTime.now());
             order.setDriverId(null);
             order.setAcceptanceTime(null);
             order.setAssignedTime(null);
             order.setPickupTime(null);
             order.setDropOffTime(null);
 
-            DocumentReference orderRef = firestore.collection("orders").document();
-            order.setOrderId(orderRef.getId());
-            orderRef.set(order).get();
+            orderRepository.save(order);
             log.info("Order created with id {}", order.getOrderId());
             return order.getOrderId();
         } catch (Exception e) {
@@ -70,50 +68,47 @@ public class OrderService {
         }
     }
 
-    public void acceptOrder(String orderId, String uid) throws ExecutionException, InterruptedException {
+    public void acceptOrder(String orderId, String driverId) throws ExecutionException, InterruptedException {
         try {
-            if (uid == null) {
+            if (driverId == null) {
                 log.error("Driver authentication not found");
                 throw new IllegalStateException("Driver must be authenticated");
             }
 
             //Проверка водителя
-            DocumentReference driverRef = firestore.collection("drivers").document(uid);
-            DocumentSnapshot driverDoc = driverRef.get().get();
-            if (!driverDoc.exists()) {
-                log.error("Driver {} not found", uid);
-                throw new IllegalStateException("Driver not found");
-            }
-            Driver driver = driverDoc.toObject(Driver.class);
-            if (!"AVAILABLE".equals(driver.getStatus())) {
-                log.error("Driver {} is not available, current status: {}", uid, driver.getStatus());
+            Driver driver = driverRepository.findById(driverId).orElseThrow(() -> {
+                log.error("Driver {} not found", driverId);
+                return new IllegalStateException("Driver not found");
+            });
+
+            if (!DriverStatus.AVAILABLE.equals(driver.getStatus())) {
+                log.error("Driver {} is not available, current status: {}", driverId, driver.getStatus());
                 throw new IllegalStateException("Driver is not available");
             }
 
             //Проверка заказа
-            DocumentReference orderRef = firestore.collection("orders").document(orderId);
-            DocumentSnapshot orderDoc = orderRef.get().get();
-            if (!orderDoc.exists()) {
+            Order order = orderRepository.findById(orderId).orElseThrow(() -> {
                 log.error("Order {} does not exist", orderId);
-                throw new IllegalArgumentException("Order not found");
-            }
-            Order order = orderDoc.toObject(Order.class);
-            if (!"PENDING".equals(order.getStatus()) && !"ASSIGNED".equals(order.getStatus())) {
+                return new IllegalArgumentException("Order not found");
+            });
+
+
+            if (!OrderStatus.PENDING.equals(order.getStatus()) && !OrderStatus.ASSIGNED.equals(order.getStatus())) {
                 log.error("Order {} is not ASSIGNED or PENDING, current status: {}", orderId, order.getStatus());
                 throw new IllegalStateException("Order cannot be accepted");
             }
 
             //Обновление статуса заказа
-            order.setDriverId(uid);
-            order.setStatus(OrderStatus.ACCEPTED.toString());
-            order.setAcceptanceTime(Timestamp.now());
+            order.setDriverId(driverId);
+            order.setStatus(OrderStatus.ACCEPTED);
+            order.setAcceptanceTime(LocalDateTime.now());
 
             //Обновление статуса водителя
-            driver.setStatus(DriverStatus.BUSY.toString());
-            driverRef.set(driver).get();
+            driver.setStatus(DriverStatus.BUSY);
 
-            orderRef.set(order).get();
-            log.info("Order {} accepted by driver {}", orderId, uid);
+            driverRepository.save(driver);
+            orderRepository.save(order);
+            log.info("Order {} accepted by driver {}", orderId, driverId);
         } catch (Exception e) {
             log.error("Failed to accept order: {}", e.getMessage());
             throw e;
@@ -122,29 +117,28 @@ public class OrderService {
 
     public void updateOrder(String orderId, String status) throws ExecutionException, InterruptedException {
         try {
-            DocumentReference orderRef = firestore.collection("orders").document(orderId);
-            DocumentSnapshot orderDoc = orderRef.get().get();
-            if (!orderDoc.exists()) {
+            //Проверка заказа
+            Order order = orderRepository.findById(orderId).orElseThrow(() -> {
                 log.error("Order {} does not found", orderId);
-                throw new IllegalArgumentException("Order not found");
-            }
-            Order order = orderDoc.toObject(Order.class);
-            if (!Arrays.toString(OrderStatus.values()).contains(order.getStatus())) {
+                return new IllegalArgumentException("Order not found");
+            });
+
+            if (!Arrays.toString(OrderStatus.values()).contains(order.getStatus().toString())) {
                 log.error("Invalid status {}", status);
                 throw new IllegalArgumentException("Invalid status");
             }
 
             //Обновление времени
             if (OrderStatus.ACCEPTED.toString().equals(status)) {
-                order.setAcceptanceTime(Timestamp.now());
+                order.setAcceptanceTime(LocalDateTime.now());
             } else if (OrderStatus.PICKED_UP.toString().equals(status)) {
-                order.setPickupTime(Timestamp.now());
+                order.setPickupTime(LocalDateTime.now());
             } else if (OrderStatus.COMPLETED.toString().equals(status)) {
-                order.setDropOffTime(Timestamp.now());
+                order.setDropOffTime(LocalDateTime.now());
             }
 
-            order.setStatus(status);
-            orderRef.set(order).get();
+            order.setStatus(OrderStatus.valueOf(status));
+            orderRepository.save(order);
             log.info("Order {} updated to status {}", orderId, status);
         } catch (Exception e) {
             log.error("Failed to update order: {}", e.getMessage());
@@ -152,7 +146,8 @@ public class OrderService {
         }
     }
 
-    public List<Order> getOrders(String uid, String status, boolean isDriver) throws ExecutionException, InterruptedException {
+    //тупое получение заказов
+ /*   public List<Order> getOrders(String uid, String status, boolean isDriver) throws ExecutionException, InterruptedException {
         try {
             List<Order> orders = new ArrayList<>();
             Query query;
@@ -180,25 +175,16 @@ public class OrderService {
             log.error("Failed to get orders: {}", e.getMessage());
             throw e;
         }
-    }
+    }*/
 
     //TO-DO:
     //тут какая-то хуйня, надо убрать проверку на uid, потому что манагеры так не смогут брать
     public Order getCurrentOrder(String orderId) throws ExecutionException, InterruptedException {
         try {
-            DocumentReference orderRef = firestore.collection("orders").document(orderId);
-            DocumentSnapshot orderDoc = orderRef.get().get();
-
-            if (!orderDoc.exists()) {
-                log.error("Order {} does not exist", orderId);
-                throw new IllegalArgumentException("Order not found");
-            }
-
-            /*            if (!uid.equals(order.getDriverId()) && !uid.equals(order.getClientId())) {
-                log.error("User {} is not authorized to view the order {}", uid, orderId);
-                throw new IllegalStateException("User is not authorized to view the order");
-            }*/
-            return orderDoc.toObject(Order.class);
+            return orderRepository.findById(orderId).orElseThrow(() -> {
+                log.error("Order {} does not found", orderId);
+                return new IllegalArgumentException("Order not found");
+            });
         } catch (Exception e) {
             log.error("Failed to get order: {}", e.getMessage());
             throw e;
@@ -213,15 +199,8 @@ public class OrderService {
                 throw new IllegalArgumentException("Invalid status");
             }
 
-            List<Order> orders = new ArrayList<>();
-            QuerySnapshot query = firestore.collection("orders").whereEqualTo("status", status).get().get();
-
-            for (DocumentSnapshot doc : query.getDocuments()) {
-                orders.add(doc.toObject(Order.class));
-            }
             //log.info("Orders {}", orders.toString());
-            return orders;
-
+            return orderRepository.findByStatus(OrderStatus.valueOf(status));
         } catch (Exception e) {
             log.error("Failed to get active orders: {}", e.getMessage());
             throw e;
@@ -231,30 +210,30 @@ public class OrderService {
     public void putDriverInOrder(String driverId, String orderId) throws ExecutionException, InterruptedException {
         try {
             //Проверка на существование заказа
-            DocumentReference orderRef = firestore.collection("orders").document(orderId);
-            DocumentSnapshot orderDoc = orderRef.get().get();
-            if (!orderDoc.exists()) {
-                log.error("Order {} does not exist", orderId);
-                throw new IllegalArgumentException("Order not found");
-            }
+            Order order = orderRepository.findById(orderId).orElseThrow(() -> {
+                log.error("Order {} does not found", orderId);
+                return new IllegalArgumentException("Order not found");
+            });
 
             //Проверка на существование водителя и его статус
-            DocumentReference driverRef = firestore.collection("drivers").document(driverId);
-            DocumentSnapshot driverDoc = driverRef.get().get();
-            if (!driverDoc.exists() || !driverDoc.getString("status").equals(DriverStatus.AVAILABLE.toString())) {
+            Driver driver = driverRepository.findById(driverId).orElseThrow(() -> {
+                log.error("Driver {} not found", driverId);
+                return new IllegalStateException("Driver not found");
+            });
+            if (!driver.getStatus().equals(DriverStatus.AVAILABLE.toString())) {
                 log.error("Order {} does not exist or driver is not available", driverId);
                 throw new IllegalArgumentException("Order not found");
             }
 
             // Меняем статус водителя
-            driverRef.update("status", DriverStatus.ASSIGNED.toString()).get();
+            driver.setStatus(DriverStatus.ASSIGNED);
 
-            // Один раз — правильно обновляем заказ
-            firestore.runTransaction(transaction -> {
-                transaction.update(orderRef, "status", OrderStatus.ASSIGNED.toString());
-                transaction.update(orderRef, "assignedTime", Timestamp.now());
-                return null;
-            }).get();
+            // Обновляем заказ
+            order.setStatus(OrderStatus.ASSIGNED);
+            order.setAssignedTime(LocalDateTime.now());
+
+            driverRepository.save(driver);
+            orderRepository.save(order);
 
             log.info("Driver {} successfully assigned to order {}", driverId, orderId);
         } catch (Exception e) {

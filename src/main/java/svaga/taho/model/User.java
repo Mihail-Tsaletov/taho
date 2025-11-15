@@ -1,53 +1,34 @@
 package svaga.taho.model;
 
-import org.springframework.stereotype.Component;
+import jakarta.persistence.*;
+import lombok.Data;
+import svaga.taho.model.UserRole;
 
-@Component
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "users")
+@Data
 public class User {
-    private String userId;
-    private String email;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private String id;
+
+    @Column(unique = true, nullable = false)
+    private String phone;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(nullable = false)
     private String name;
-    private String phoneNumber;
 
-    public User() {
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role;
 
-    public User(String userId, String phoneNumber, String name, String email) {
-        this.userId = userId;
-        this.phoneNumber = phoneNumber;
-        this.name = name;
-        this.email = email;
-    }
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
+    private boolean enabled = true;
 }
