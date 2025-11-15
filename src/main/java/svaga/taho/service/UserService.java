@@ -4,6 +4,7 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -99,4 +100,21 @@ public class UserService {
     }
 
 
+    public void approveDriver(String driverId) {
+        // Проверка: запись водителя существует?
+        Driver driver = driverRepository.findById(driverId).orElse(null);
+        if (driver == null) {
+            log.error("Driver with uid: {} does not exist", driverId);
+            return;
+        }
+
+        if ("OFFLINE".equals(driver.getStatus().toString()) || "AVAILABLE".equals(driver.getStatus().toString())) {
+            log.error("Driver with uid: {} already approved", driverId);
+            return;
+        }
+
+        // Обновляем статус
+        driver.setStatus(DriverStatus.OFFLINE);
+        driverRepository.save(driver);
+    }
 }

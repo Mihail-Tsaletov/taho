@@ -54,32 +54,22 @@ public class UserController {
     @PostMapping("/approveDriver")
     public ResponseEntity<String> approveDriverRole(@RequestBody Map<String, String> request) {
         String currentUserUid = getCurrentUserUid();
-        String driverUid = request.get("driverId");
+        String driverId = request.get("driverId");
+        try {
+            // Проверка: текущий пользователь — менеджер?
+            if (!managerRepository.existsByUserId(currentUserUid)) {
+                log.error("Only managers can approve drivers. User {} is not a manager.", currentUserUid);
+                return ResponseEntity.badRequest().body("Only managers can approve drivers");
+            }
 
-        // Проверка: текущий пользователь — менеджер?
-        if (!managerRepository.existsByUserId(currentUserUid)) {
-            log.error("Only managers can approve drivers. User {} is not a manager.", currentUserUid);
-            return ResponseEntity.badRequest().body("Only managers can approve drivers");
+            userService.approveDriver(driverId);
+
+            log.info("Driver {} approved by manager {}", driverId, currentUserUid);
+            return ResponseEntity.ok("Driver approved");
+        } catch (Exception e) {
+            log.error("Error approving driver {}", driverId, e);
+            return ResponseEntity.badRequest().body("Error approving driver " + driverId);
         }
-
-        // Проверка: запись водителя существует?
-        Driver driver = driverRepository.findById(driverUid).orElse(null);
-        if (driver == null) {
-            log.error("Driver with uid: {} does not exist", driverUid);
-            return ResponseEntity.badRequest().body("Driver profile not found");
-        }
-
-        if ("OFFLINE".equals(driver.getStatus().toString()) || "AVAILABLE".equals(driver.getStatus().toString())) {
-            log.error("Driver with uid: {} already approved", driverUid);
-            return ResponseEntity.badRequest().body("Driver already approved");
-        }
-
-        // Обновляем статус
-        driver.setStatus(DriverStatus.OFFLINE);
-        driverRepository.save(driver);
-
-        log.info("Driver {} approved by manager {}", driverUid, currentUserUid);
-        return ResponseEntity.ok("Driver approved");
     }
 
     //@PreAuthorize("hasRole('MANAGER')")
