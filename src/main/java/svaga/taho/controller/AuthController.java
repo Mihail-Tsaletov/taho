@@ -1,8 +1,7 @@
 // src/main/java/svaga/taho/controller/AuthController.java
 package svaga.taho.controller;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import svaga.taho.DTO.LoginRequest;
 import svaga.taho.DTO.RegisterRequest;
 import svaga.taho.model.User;
@@ -16,10 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private final static Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private UserService userService;
@@ -41,14 +40,13 @@ public class AuthController {
             User user = userService.register(request);
             String token = jwtService.generateToken(user.getPhone(), user.getRole().toString());
 
-            log.info("User registered successful: " + user.getPhone());
             return ResponseEntity.ok(Map.of(
-                    "message", "Registration successful!",
+                    "message", "Регистрация успешна",
                     "token", token,
-                    "role", user.getRole()
+                    "role", user.getRole(),
+                    "name", user.getName()
             ));
         } catch (Exception e) {
-            log.error("Can't register user {}", request.getPhone());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -58,19 +56,18 @@ public class AuthController {
         try {
             User user = userService.findByPhone(request.getPhone());
             if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-                return ResponseEntity.status(401).body(Map.of("error", "Incorrect password!"));
+                return ResponseEntity.status(401).body(Map.of("error", "Неверный пароль"));
             }
 
             String token = jwtService.generateToken(user.getPhone(), user.getRole().toString());
 
-            log.info("User login successful: {} token: {}",user.getPhone(), token);
             return ResponseEntity.ok(Map.of(
                     "token", token,
                     "role", user.getRole(),
                     "name", user.getName()
             ));
         } catch (Exception e) {
-            log.error("Can't login user {}", request.getPhone());
+            log.error(e.getMessage());
             return ResponseEntity.status(401).body(Map.of("error", "Пользователь не найден"));
         }
     }

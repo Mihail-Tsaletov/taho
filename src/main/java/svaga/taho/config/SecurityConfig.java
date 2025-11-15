@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import svaga.taho.service.JwtService;
 
 import javax.sql.DataSource;
 
@@ -20,18 +21,25 @@ import javax.sql.DataSource;
 @EnableWebSecurity
 public class SecurityConfig {
     @Autowired
-    private JwtFilter jwtFilter;
+    private JwtService jwtService;  // ← Внедряем JwtService
 
+    @Autowired
+    private UserDetailsService userDetailsService;  // ← Внедряем UserDetailsService
+
+    @Bean
+    public JwtFilter jwtFilter() {
+        return new JwtFilter(jwtService, userDetailsService);  // ← Теперь jwtService есть!
+    }
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/firebase/test", "/manager").permitAll()
+                        .requestMatchers("/manager").permitAll()
                         .requestMatchers("api/**").permitAll()
                         .anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

@@ -9,16 +9,22 @@ import org.springframework.stereotype.Component;
 @Data
 public class Driver {
     @Id
-    @Column(name = "driver_id", length = 50)
+    @Column(name = "driver_id", length = 50, nullable = false, insertable = true, updatable = false)
     private String driverId;
 
     @Column(name = "user_id", length = 50, unique = true)
     private String userId;
 
-    private String email;
     private String name;
     private String phoneNumber;
 
     @Enumerated(EnumType.STRING)
     private DriverStatus status = DriverStatus.PENDING;
+
+    @PrePersist
+    public void generateId() {
+        if (this.driverId == null) {
+            this.driverId = java.util.UUID.randomUUID().toString();
+        }
+    }
 }

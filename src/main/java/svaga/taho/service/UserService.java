@@ -1,8 +1,6 @@
 package svaga.taho.service;
 
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,10 +8,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import svaga.taho.DTO.RegisterRequest;
-import svaga.taho.model.Driver;
-import svaga.taho.model.DriverStatus;
-import svaga.taho.model.Manager;
-import svaga.taho.model.User;
+import svaga.taho.model.*;
 import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IManagerRepository;
 import svaga.taho.repository.IOrderRepository;
@@ -38,6 +33,7 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Transactional
     public User register(RegisterRequest request) {
         if (userRepository.existsByPhone(request.getPhone())) {
             throw new RuntimeException("Пользователь с таким номером уже существует");  // TO:DO сделать проверку на роль водителя,
@@ -50,8 +46,17 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
         user.setRole(request.getRole());
+        userRepository.save(user);
+        if(request.getRole().equals(UserRole.DRIVER)) {
+            Driver driver = new Driver();
+            driver.setStatus(DriverStatus.PENDING);
+            driver.setUserId(user.getId());
+            driver.setName(request.getName());
+            driver.setPhoneNumber(request.getPhone());
+            driverRepository.save(driver);
+        }
 
-        return userRepository.save(user);
+        return user;
     }
 
     public User findByPhone(String phone) {

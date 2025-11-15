@@ -9,9 +9,16 @@ import com.google.firebase.auth.FirebaseToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import svaga.taho.model.Driver;
+import svaga.taho.model.DriverStatus;
 import svaga.taho.model.User;
+import svaga.taho.repository.IDriverRepository;
+import svaga.taho.repository.IManagerRepository;
+import svaga.taho.repository.IUserRepository;
+import svaga.taho.service.JwtService;
 import svaga.taho.service.UserService;
 
 import java.util.List;
@@ -24,76 +31,78 @@ import java.util.concurrent.ExecutionException;
 public class UserController {
     private final static Logger log = LoggerFactory.getLogger(UserController.class);
     private final UserService userService;
-    private final Firestore firestore;
+    private final IUserRepository userRepository;
+    private final IDriverRepository driverRepository;
+    private final IManagerRepository managerRepository;
+    private final JwtService jwtService;
 
-    public UserController(UserService userService, Firestore firestore) {
+    public UserController(
+            UserService userService,
+            IUserRepository userRepository,
+            IDriverRepository driverRepository,
+            IManagerRepository managerRepository,
+            JwtService jwtService
+    ) {
         this.userService = userService;
-        this.firestore = firestore;
+        this.userRepository = userRepository;
+        this.driverRepository = driverRepository;
+        this.managerRepository = managerRepository;
+        this.jwtService = jwtService;
     }
 
+    //@PreAuthorize("hasRole('MANAGER')") //TO:DO потом раскоментить
     @PostMapping("/approveDriver")
-    public ResponseEntity<String> approveDriverRole(@RequestHeader("Authorization") String authHeader,
-                                                @RequestBody Map<String, String> request) throws Exception{
-        String idToken = authHeader.replace("Bearer ", "");
-        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-        String uid = decodedToken.getUid();
-        String driverUid = request.get("driverUid");
+    public ResponseEntity<String> approveDriverRole(@RequestBody Map<String, String> request) {
+        String currentUserUid = getCurrentUserUid();
+        String driverUid = request.get("driverId");
 
-        DocumentSnapshot managerDoc = firestore.collection("managers").document("MG" + uid).get().get();
-        if(!managerDoc.exists()) {
-            log.error("Only managers can approve drivers, manager with id {} does not exist", uid);
-            return ResponseEntity.badRequest().body(null);
+        // Проверка: текущий пользователь — менеджер?
+        if (!managerRepository.existsByUserId(currentUserUid)) {
+            log.error("Only managers can approve drivers. User {} is not a manager.", currentUserUid);
+            return ResponseEntity.badRequest().body("Only managers can approve drivers");
         }
 
-        DocumentSnapshot userDoc = firestore.collection("users").document(driverUid).get().get();
-        if(!userDoc.exists()) {
-            log.error("User with uid: {} does not exist", driverUid);
-            return ResponseEntity.badRequest().body(null);
+        // Проверка: запись водителя существует?
+        Driver driver = driverRepository.findById(driverUid).orElse(null);
+        if (driver == null) {
+            log.error("Driver with uid: {} does not exist", driverUid);
+            return ResponseEntity.badRequest().body("Driver profile not found");
         }
 
-        DocumentReference driverRef = firestore.collection("drivers").document(driverUid);
-        if(!driverRef.get().get().exists()){
-            log.error("Driver with uid: {} does not exist", uid);
-            return ResponseEntity.badRequest().body(null);
-        }else if(Objects.requireNonNull(driverRef.get().get().get("status")).toString().equals("Approved")) {
-            log.error("Driver with uid: {} already approved", uid);
-            return ResponseEntity.badRequest().body(null);
+        if ("OFFLINE".equals(driver.getStatus().toString()) || "AVAILABLE".equals(driver.getStatus().toString())) {
+            log.error("Driver with uid: {} already approved", driverUid);
+            return ResponseEntity.badRequest().body("Driver already approved");
         }
 
-        driverRef.set(Map.of(
-                "driverId", driverUid,
-                "name", userDoc.getString("name"),
-                "email", userDoc.getString("email"),
-                "phoneNumber", userDoc.getString("phoneNumber"),
-                "status", "OFFLINE"
-        )).get();
-        log.info("Driver {} approved", uid);
-        return ResponseEntity.ok().build();
+        // Обновляем статус
+        driver.setStatus(DriverStatus.OFFLINE);
+        driverRepository.save(driver);
+
+        log.info("Driver {} approved by manager {}", driverUid, currentUserUid);
+        return ResponseEntity.ok("Driver approved");
     }
 
+    //@PreAuthorize("hasRole('MANAGER')")
     @PostMapping("/approveManager")
-    public ResponseEntity<String> approveManager(@RequestHeader("Authorization") String authHeader,
-                                                 @RequestBody Map<String, String> request) throws Exception {
-        String idToken = authHeader.replace("Bearer ", "");
-        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-        String approvedManagerUid ="MG" + decodedToken.getUid();
+    public ResponseEntity<String> approveManager(@RequestBody Map<String, String> request) {
+        String currentManagerUid = getCurrentUserUid();
         String userUid = request.get("userUid");
 
-        DocumentSnapshot managerDoc = firestore.collection("managers").document(approvedManagerUid).get().get();
-        if(!managerDoc.exists()) {
-            log.error("Manager with uid: {} does not exist", approvedManagerUid);
-            return ResponseEntity.badRequest().body(null);
+        // Проверка: текущий — менеджер?
+        if (!managerRepository.existsByUserId(currentManagerUid)) {
+            log.error("Only managers can approve");
+            return ResponseEntity.badRequest().body("Only managers can approve");
         }
 
-        DocumentSnapshot userDoc = firestore.collection("users").document(userUid).get().get();
-        if(!userDoc.exists()) {
-            log.error("User with uid: {} does not exist", userUid);
-            return ResponseEntity.badRequest().body(null);
+        // Проверка: пользователь существует?
+        if (!userRepository.existsById(userUid)) {
+            log.error("User not found");
+            return ResponseEntity.badRequest().body("User not found");
         }
 
-        String resId = userService.createManager(userUid);
-        log.info("Manager {} approved", resId);
-        return ResponseEntity.ok().build();
+        String managerId = userService.createManager(userUid);
+        log.info("Manager {} approved by {}", managerId, currentManagerUid);
+        return ResponseEntity.ok(managerId);
     }
 
     //Возвращает максимум 5 свободных водителей
@@ -109,14 +118,10 @@ public class UserController {
 
     }
 
-    private String decodeToken(String authHeader) throws Exception {
-        try {
-            String idToken = authHeader.replace("Bearer ", "");
-            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-            return decodedToken.getUid();
-        } catch (Exception e) {
-            log.error("Can't decode header: {}, exception: {}", authHeader, e.getMessage());
-            throw e;
-        }
+    private String getCurrentUserUid() {
+        String phone = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByPhone(phone)
+                .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
+                .getId();
     }
 }

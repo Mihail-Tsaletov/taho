@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", length = 50, nullable = false, insertable = true, updatable = false)
     private String id;
 
     @Column(unique = true, nullable = false)
@@ -31,4 +31,11 @@ public class User {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private boolean enabled = true;
+
+    @PrePersist
+    public void generateId() {
+        if (this.id == null) {
+            this.id = java.util.UUID.randomUUID().toString();
+        }
+    }
 }

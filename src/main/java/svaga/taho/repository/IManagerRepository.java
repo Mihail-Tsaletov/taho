@@ -6,4 +6,5 @@ import svaga.taho.model.Manager;
 
 @Repository
 public interface IManagerRepository extends JpaRepository<Manager, String> {
+    boolean existsByUserId(String currentUserUid);
 }

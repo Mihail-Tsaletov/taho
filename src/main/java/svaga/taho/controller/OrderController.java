@@ -27,11 +27,9 @@ GET /api/orders/{id}: Получение информации о конкрет�
 public class OrderController {
     private final static Logger log = LoggerFactory.getLogger(OrderController.class);
     private final OrderService orderService;
-    private final Order order;
 
-    public OrderController(OrderService orderService, Order order) {
+    public OrderController(OrderService orderService) {
         this.orderService = orderService;
-        this.order = order;
     }
 
     @PostMapping
