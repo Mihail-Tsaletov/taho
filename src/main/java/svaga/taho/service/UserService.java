@@ -42,20 +42,27 @@ public class UserService {
             //зарегать к этой же учетке водилу
         }
 
+        //Если пользователь регается как водитель уже после создания основной учетки
+        if(request.getRole().equals(UserRole.DRIVER)) {
+            User user = userRepository.findByPhone(request.getPhone()).get(); //Уже существующая запись пользователя
+            Driver driver = new Driver();
+            driver.setStatus(DriverStatus.PENDING);
+            driver.setUserId(user.getId());
+            driver.setName(request.getName());
+            driver.setPhoneNumber(request.getPhone());
+            user.setRole(UserRole.DRIVER);
+            userRepository.save(user);
+            driverRepository.save(driver);
+            return user; //возвращается учетка юзерская
+        }
+
+        //Если пользователь регается первый раз
         User user = new User();
         user.setPhone(request.getPhone());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
         user.setRole(request.getRole());
         userRepository.save(user);
-        if(request.getRole().equals(UserRole.DRIVER)) {
-            Driver driver = new Driver();
-            driver.setStatus(DriverStatus.PENDING);
-            driver.setUserId(user.getId());
-            driver.setName(request.getName());
-            driver.setPhoneNumber(request.getPhone());
-            driverRepository.save(driver);
-        }
 
         return user;
     }
