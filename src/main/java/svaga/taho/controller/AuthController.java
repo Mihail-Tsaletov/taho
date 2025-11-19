@@ -61,6 +61,7 @@ public class AuthController {
 
             String token = jwtService.generateToken(user.getPhone(), user.getRole().toString());
 
+            log.info("User login with phone: {}", request.getPhone());
             return ResponseEntity.ok(Map.of(
                     "token", token,
                     "role", user.getRole(),

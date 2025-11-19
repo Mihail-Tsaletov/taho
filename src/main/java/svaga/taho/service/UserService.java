@@ -53,6 +53,7 @@ public class UserService {
             user.setRole(UserRole.DRIVER);
             userRepository.save(user);
             driverRepository.save(driver);
+            log.info("User register as driver with params: {}", driver.toString());
             return user; //возвращается учетка юзерская
         }
 
@@ -63,6 +64,7 @@ public class UserService {
         user.setName(request.getName());
         user.setRole(request.getRole());
         userRepository.save(user);
+        log.info("User register with params: {}", user.toString());
 
         return user;
     }
