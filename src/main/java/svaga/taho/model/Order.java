@@ -1,5 +1,6 @@
 package svaga.taho.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 @Data
 public class Order {
     @Id
-    @Column(name = "order_id", length = 50)
+    @Column(name = "order_id", length = 50, nullable = false, insertable = true, updatable = false)
     private String orderId;
 
     @Column(name = "client_id", length = 50)
@@ -25,6 +26,15 @@ public class Order {
 
     private String startPoint;
     private String endPoint;
+
+    @JsonProperty("startAddress")
+    @Column(name = "start_address")
+    private String startAddress;
+
+    @JsonProperty("endAddress")
+    @Column(name = "end_address")
+    private String endAddress;
+
     private boolean withinCity = true;
     private BigDecimal price;
 
@@ -36,4 +46,11 @@ public class Order {
     private LocalDateTime acceptanceTime;
     private LocalDateTime pickupTime;
     private LocalDateTime dropOffTime;
+
+    @PrePersist
+    public void generateId() {
+        if (this.orderId == null) {
+            this.orderId = java.util.UUID.randomUUID().toString();
+        }
+    }
 }

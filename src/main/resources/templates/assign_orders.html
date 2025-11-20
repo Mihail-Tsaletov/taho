@@ -57,8 +57,8 @@
                 div.innerHTML = `
                         <strong>Заказ #${order.orderId}</strong><br>
                         <small>Создан: ${order.orderTime ? new Date(order.orderTime.seconds*1000).toLocaleString('ru-RU') : '—'}</small><br><br>
-                        Откуда: <strong>${order.startPoint}</strong><br>
-                        Куда: <strong>${order.endPoint}</strong><br>
+                        Откуда: <strong>${order.startAddress}</strong><br>
+                        Куда: <strong>${order.endAddress}</strong><br>
                         Цена: <strong>${order.price || 0} ₽</strong>
                         <select data-order-id="${order.orderId}">
                             <option value="">— Выберите водителя —</option>

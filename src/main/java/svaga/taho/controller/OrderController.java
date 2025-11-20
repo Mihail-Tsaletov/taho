@@ -6,10 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import svaga.taho.model.Order;
+import svaga.taho.repository.IUserRepository;
 import svaga.taho.service.OrderService;
+import svaga.taho.service.UserService;
 
 import java.util.List;
 import java.util.Map;
@@ -27,16 +30,18 @@ GET /api/orders/{id}: Получение информации о конкрет�
 public class OrderController {
     private final static Logger log = LoggerFactory.getLogger(OrderController.class);
     private final OrderService orderService;
+    private final IUserRepository userRepository;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, IUserRepository userRepository) {
         this.orderService = orderService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping
     public ResponseEntity<String> createOrder(@RequestHeader("Authorization") String authHeader,
                                               @RequestBody Order order) {
         try {
-            String uid = decodeToken(authHeader);
+            String uid = getCurrentUserUid();
             String orderId = orderService.createOrder(order, uid);
             log.info("Created order with Id: {}, by user: {}", orderId, uid);
             return ResponseEntity.ok(orderId);
@@ -52,7 +57,7 @@ public class OrderController {
     public ResponseEntity<Void> acceptOrder(@RequestHeader("Authorization") String authHeader,
                                             @PathVariable("id") String orderId) {
         try {
-            String uid = decodeToken(authHeader);
+            String uid = getCurrentUserUid();
             orderService.acceptOrder(orderId, uid);
             log.info("Accepted order with Id: {}, by driver: {}", orderId, uid);
             return ResponseEntity.ok().build();
@@ -68,7 +73,7 @@ public class OrderController {
                                                   @PathVariable("id") String orderId,
                                                   @RequestBody Map<String, String> request) {
         try {
-            String uid = decodeToken(authHeader);
+            String uid = getCurrentUserUid();
             String status = request.get("status");
 
             if (status == null || status.isEmpty()) {
@@ -107,7 +112,7 @@ public class OrderController {
     public ResponseEntity<Order> getOrder(@RequestHeader("Authorization") String authHeader,
                                           @PathVariable("id") String orderId) {
         try {
-            String uid = decodeToken(authHeader);
+            String uid = getCurrentUserUid();
             Order order = orderService.getCurrentOrder(orderId);
             log.info("Get order with Id: {}, by user: {}", orderId, uid);
             return ResponseEntity.ok(order);
@@ -139,14 +144,10 @@ public class OrderController {
         }
     }
 
-    private String decodeToken(String authHeader) throws Exception {
-        try {
-            String idToken = authHeader.replace("Bearer ", "");
-            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-            return decodedToken.getUid();
-        } catch (Exception e) {
-            log.error("Can't decode header: {}, exception: {}", authHeader, e.getMessage());
-            throw e;
-        }
+    private String getCurrentUserUid() {
+        String phone = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByPhone(phone)
+                .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
+                .getId();
     }
 }
