@@ -68,26 +68,26 @@ public class OrderService {
         }
     }
 
-    public void acceptOrder(String orderId, String driverId) throws ExecutionException, InterruptedException {
+    public void acceptOrder(String orderId, String uid) throws ExecutionException, InterruptedException {
         try {
-            if (driverId == null) {
+            if (uid == null) {
                 log.error("Driver authentication not found");
                 throw new IllegalStateException("Driver must be authenticated");
             }
 
-            //Проверка водителя
-            Driver driver = driverRepository.findById(driverId).orElseThrow(() -> {
-                log.error("Driver {} not found", driverId);
+            //Проверка водителя, поиск по uid тк токен показывает юзерский айди
+            Driver driver = driverRepository.findByUserId(uid).orElseThrow(() -> {
+                log.error("Driver {} not found", uid);
                 return new IllegalStateException("Driver not found");
             });
 
-            if (!DriverStatus.AVAILABLE.equals(driver.getStatus())) {
-                log.error("Driver {} is not available, current status: {}", driverId, driver.getStatus());
+            if (!DriverStatus.ASSIGNED.equals(driver.getStatus())) {
+                log.error("Driver {} is not available, current status: {}", uid, driver.getStatus());
                 throw new IllegalStateException("Driver is not available");
             }
 
             //Проверка заказа
-            Order order = orderRepository.findById(orderId).orElseThrow(() -> {
+            Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
                 log.error("Order {} does not exist", orderId);
                 return new IllegalArgumentException("Order not found");
             });
@@ -99,7 +99,7 @@ public class OrderService {
             }
 
             //Обновление статуса заказа
-            order.setDriverId(driverId);
+            order.setDriverId(driver.getDriverId());
             order.setStatus(OrderStatus.ACCEPTED);
             order.setAcceptanceTime(LocalDateTime.now());
 
@@ -108,7 +108,7 @@ public class OrderService {
 
             driverRepository.save(driver);
             orderRepository.save(order);
-            log.info("Order {} accepted by driver {}", orderId, driverId);
+            log.info("Order {} accepted by driver {}", orderId, driver.getDriverId());
         } catch (Exception e) {
             log.error("Failed to accept order: {}", e.getMessage());
             throw e;
@@ -210,7 +210,7 @@ public class OrderService {
     public void putDriverInOrder(String driverId, String orderId) throws ExecutionException, InterruptedException {
         try {
             //Проверка на существование заказа
-            Order order = orderRepository.findById(orderId).orElseThrow(() -> {
+            Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
                 log.error("Order {} does not found", orderId);
                 return new IllegalArgumentException("Order not found");
             });
@@ -220,9 +220,9 @@ public class OrderService {
                 log.error("Driver {} not found", driverId);
                 return new IllegalStateException("Driver not found");
             });
-            if (!driver.getStatus().equals(DriverStatus.AVAILABLE.toString())) {
-                log.error("Order {} does not exist or driver is not available", driverId);
-                throw new IllegalArgumentException("Order not found");
+            if (!driver.getStatus().equals(DriverStatus.AVAILABLE)) {
+                log.error("Driver {} status is not AVAILABLE, status: {}", driverId, driver.getStatus());
+                throw new IllegalArgumentException("Driver has another status");
             }
 
             // Меняем статус водителя

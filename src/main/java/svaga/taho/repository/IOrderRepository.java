@@ -6,12 +6,16 @@ import svaga.taho.model.Order;
 import svaga.taho.model.OrderStatus;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface IOrderRepository extends JpaRepository<Order, String> {
 
     // Для менеджера: все заказы с определённым статусом
     List<Order> findByStatus(OrderStatus status);
+
+    //Поиск по айди
+    Optional<Order> findByOrderId(String Id);
 
     // Для клиента: все заказы по clientId
     List<Order> findByClientId(String clientId);

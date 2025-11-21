@@ -7,10 +7,15 @@ import svaga.taho.model.Driver;
 import svaga.taho.model.DriverStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface IDriverRepository extends JpaRepository<Driver, String> {
     List<Driver> findByStatus(DriverStatus status);
     List<Driver> findByStatusIn(List<DriverStatus> statuses); //поиск по нескольким статусам сразу
     List<Driver> findTop5ByStatus(DriverStatus status);
+
+    Optional<Driver> findByDriverId(String driverId);
+
+    Optional<Driver> findByUserId(String uid);
 }
