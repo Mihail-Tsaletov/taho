@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import svaga.taho.model.Order;
+import svaga.taho.model.OrderStatus;
 import svaga.taho.repository.IUserRepository;
 import svaga.taho.service.OrderService;
 import svaga.taho.service.UserService;
@@ -80,7 +81,7 @@ public class OrderController {
                 return ResponseEntity.badRequest().body(null);
             }
 
-            orderService.updateOrder(orderId, status);
+            orderService.updateOrderStatus(orderId, OrderStatus.valueOf(status));
             log.info("Updated order with Id: {} to status {}, by user: {}", orderId, status, uid);
             return ResponseEntity.ok().build();
         } catch (Exception e) {

@@ -1,7 +1,6 @@
 package svaga.taho.service;
 
-import com.google.cloud.firestore.*;
-import com.google.firebase.cloud.FirestoreClient;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +13,9 @@ import svaga.taho.repository.IUserRepository;
 import java.time.LocalDateTime;
 
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.util.Map;
 
 @Service
 public class OrderService {
@@ -28,8 +26,10 @@ public class OrderService {
     private IOrderRepository orderRepository;
     @Autowired
     private IDriverRepository driverRepository;
+    @Autowired
+    private SseService sseService;
 
-    public String createOrder(Order order, String uid) throws ExecutionException, InterruptedException {
+    public String createOrder(Order order, String uid) {
         try {
             //String uid = SecurityContextHolder.getContext().getAuthentication().getName(); Пока коммент, передаем uid как аргумент
             if (uid == null) {
@@ -60,6 +60,7 @@ public class OrderService {
             order.setDropOffTime(null);
 
             orderRepository.save(order);
+
             log.info("Order created with id {}", order.getOrderId());
             return order.getOrderId();
         } catch (Exception e) {
@@ -68,7 +69,7 @@ public class OrderService {
         }
     }
 
-    public void acceptOrder(String orderId, String uid) throws ExecutionException, InterruptedException {
+    public void acceptOrder(String orderId, String uid) {
         try {
             if (uid == null) {
                 log.error("Driver authentication not found");
@@ -108,6 +109,14 @@ public class OrderService {
 
             driverRepository.save(driver);
             orderRepository.save(order);
+
+            // ← ОТПРАВЛЯЕМ ОБНОВЛЕНИЕ ВСЕМ ПОДПИСЧИКАМ
+            sseService.sendOrderUpdate(orderId, Map.of(
+                    "status", order.getStatus(),
+                    "driverName", driver.getName(),
+                    "driverPhone", driver.getPhoneNumber()
+            ));
+
             log.info("Order {} accepted by driver {}", orderId, driver.getDriverId());
         } catch (Exception e) {
             log.error("Failed to accept order: {}", e.getMessage());
@@ -115,7 +124,7 @@ public class OrderService {
         }
     }
 
-    public void updateOrder(String orderId, String status) throws ExecutionException, InterruptedException {
+/*    public void updateOrder(String orderId, String status) {
         try {
             //Проверка заказа
             Order order = orderRepository.findById(orderId).orElseThrow(() -> {
@@ -144,42 +153,40 @@ public class OrderService {
             log.error("Failed to update order: {}", e.getMessage());
             throw e;
         }
-    }
-
-    //тупое получение заказов
- /*   public List<Order> getOrders(String uid, String status, boolean isDriver) throws ExecutionException, InterruptedException {
-        try {
-            List<Order> orders = new ArrayList<>();
-            Query query;
-
-            if (isDriver && status != null && List.of("PENDING", "ASSIGNED").contains(status)) {
-                //Водитель запрашивает доступные заказы
-                query = firestore.collection("orders").whereEqualTo("status", status);
-            } else if (isDriver) {
-                //Водитель запрашивает свои заказы
-                query = firestore.collection("orders").whereEqualTo("driverId", uid);
-            } else {
-                //Клиент запрашивает свои заказы
-                query = firestore.collection("orders").whereEqualTo("clientId", uid);
-                if (status != null) {
-                    query = query.whereEqualTo("status", status);
-                }
-            }
-
-            QuerySnapshot querySnapshot = query.get().get();
-            for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
-                orders.add(doc.toObject(Order.class));
-            }
-            return orders;
-        } catch (Exception e) {
-            log.error("Failed to get orders: {}", e.getMessage());
-            throw e;
-        }
     }*/
 
-    //TO-DO:
-    //тут какая-то хуйня, надо убрать проверку на uid, потому что манагеры так не смогут брать
-    public Order getCurrentOrder(String orderId) throws ExecutionException, InterruptedException {
+    @Transactional
+    public void updateOrderStatus(String orderId, OrderStatus status) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.error("Order {} does not found", orderId);
+                   return new IllegalArgumentException("Order not found");
+                });
+
+        if (!Arrays.toString(OrderStatus.values()).contains(order.getStatus().toString())) {
+            log.error("Invalid status {}", status);
+            throw new IllegalArgumentException("Invalid status");
+        }
+
+        //Обновление времени
+        if (OrderStatus.ACCEPTED.equals(status)) {
+            order.setAcceptanceTime(LocalDateTime.now());
+        } else if (OrderStatus.PICKED_UP.equals(status)) {
+            order.setPickupTime(LocalDateTime.now());
+        } else if (OrderStatus.COMPLETED.equals(status)) {
+            order.setDropOffTime(LocalDateTime.now());
+        }
+
+        order.setStatus(status);
+        orderRepository.save(order);
+
+        // ← ОТПРАВЛЯЕМ ОБНОВЛЕНИЕ ВСЕМ ПОДПИСЧИКАМ
+        sseService.sendOrderUpdate(orderId, Map.of(
+                "status", status
+        ));
+    }
+
+    public Order getCurrentOrder(String orderId) {
         try {
             return orderRepository.findById(orderId).orElseThrow(() -> {
                 log.error("Order {} does not found", orderId);
@@ -192,7 +199,7 @@ public class OrderService {
     }
 
 
-    public List<Order> getOrdersWithStatus(String status) throws ExecutionException, InterruptedException {
+    public List<Order> getOrdersWithStatus(String status){
         try {
             if (!Arrays.toString(OrderStatus.values()).contains(status)) {
                 log.error("Invalid status {}", status);
@@ -207,7 +214,7 @@ public class OrderService {
         }
     }
 
-    public void putDriverInOrder(String driverId, String orderId) throws ExecutionException, InterruptedException {
+    public void putDriverInOrder(String driverId, String orderId){
         try {
             //Проверка на существование заказа
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
