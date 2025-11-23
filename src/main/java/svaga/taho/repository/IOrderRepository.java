@@ -23,6 +23,9 @@ public interface IOrderRepository extends JpaRepository<Order, String> {
     // Для водителя: все заказы по driverId
     List<Order> findByDriverId(String driverId);
 
-    // Комбинированный поиск (например, NEW + ASSIGNED)
+    // Комбинированный поиск (например, PENDING + ASSIGNED)
     List<Order> findByStatusIn(List<OrderStatus> statuses);
+
+    //Поиск заказов от конкретного пользователя с несколькими статусами(PENDING, ASSIGNED, ACCEPTED)
+    List<Order> findByClientIdAndStatusIn(String clientId, List<OrderStatus> statuses);
 }

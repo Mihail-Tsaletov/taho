@@ -1,7 +1,5 @@
 package svaga.taho.controller;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -9,11 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import svaga.taho.DTO.OrderResponse;
 import svaga.taho.model.Order;
 import svaga.taho.model.OrderStatus;
+import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IUserRepository;
 import svaga.taho.service.OrderService;
-import svaga.taho.service.UserService;
 
 import java.util.List;
 import java.util.Map;
@@ -32,10 +31,12 @@ public class OrderController {
     private final static Logger log = LoggerFactory.getLogger(OrderController.class);
     private final OrderService orderService;
     private final IUserRepository userRepository;
+    private final IDriverRepository driverRepository;
 
-    public OrderController(OrderService orderService, IUserRepository userRepository) {
+    public OrderController(OrderService orderService, IUserRepository userRepository, IDriverRepository driverRepository) {
         this.orderService = orderService;
         this.userRepository = userRepository;
+        this.driverRepository = driverRepository;
     }
 
     @PostMapping
@@ -136,12 +137,56 @@ public class OrderController {
             String driverId = request.get("driverId");
             String orderId = request.get("orderId");
 
-            orderService.putDriverInOrder(driverId,orderId);
-            log.info("Put driver {} in order with Id: {}",driverId, orderId);
+            orderService.putDriverInOrder(driverId, orderId);
+            log.info("Put driver {} in order with Id: {}", driverId, orderId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            log.error("Can't put driver {} in order {} , exception: {}", request.get("driverId"), request.get("orderId"),  e.getMessage());
+            log.error("Can't put driver {} in order {} , exception: {}", request.get("driverId"), request.get("orderId"), e.getMessage());
             throw e;
+        }
+    }
+
+    @GetMapping("/getOrdersByUserIdWithStatuses")
+    @ResponseBody
+    public ResponseEntity<List<OrderResponse>> getOrdersByUserIdWithStatuses(@RequestParam("statuses") List<OrderStatus> statuses) {
+        try {
+            String clientId = getCurrentUserUid();
+            log.info("Fetching orders for user {} with statuses: {}", clientId, statuses);
+
+            // Если статусы не переданы — возвращаем все
+            if (statuses == null || statuses.isEmpty()) {
+                statuses = List.of(OrderStatus.values());
+            }
+
+            List<Order> orders = orderService.getOrdersByUIDAndStatuses(clientId, statuses);
+
+            // Преобразуем Order + Driver → OrderResponse
+            List<OrderResponse> response = orders.stream()
+                    .map(order -> {
+                        OrderResponse dto = new OrderResponse();
+                        dto.setId(order.getOrderId());
+                        dto.setStartAddress(order.getStartAddress());
+                        dto.setEndAddress(order.getEndAddress());
+                        dto.setStatus(order.getStatus());
+
+                        // Достаём водителя, если он назначен
+                        if (order.getDriverId() != null) {
+                            driverRepository.findByDriverId(order.getDriverId())
+                                    .ifPresent(driver -> {
+                                        dto.setDriverName(driver.getName());
+                                        dto.setDriverPhone(driver.getPhoneNumber());
+                                    });
+                        }
+
+                        return dto;
+                    })
+                    .toList();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Error fetching orders: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

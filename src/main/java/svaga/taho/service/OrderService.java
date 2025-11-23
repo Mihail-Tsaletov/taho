@@ -206,7 +206,6 @@ public class OrderService {
                 throw new IllegalArgumentException("Invalid status");
             }
 
-            //log.info("Orders {}", orders.toString());
             return orderRepository.findByStatus(OrderStatus.valueOf(status));
         } catch (Exception e) {
             log.error("Failed to get active orders: {}", e.getMessage());
@@ -245,6 +244,20 @@ public class OrderService {
             log.info("Driver {} successfully assigned to order {}", driverId, orderId);
         } catch (Exception e) {
             log.error("Failed to put driver {} in order {} error: {}", driverId, orderId, e.getMessage());
+            throw e;
+        }
+    }
+
+    public List<Order> getOrdersByUIDAndStatuses(String uid, List<OrderStatus> statuses){
+        User user = userRepository.findById(uid).orElseThrow(() -> {
+            log.error("User {} does not exist", uid);
+            return new IllegalStateException("User not found");
+        });
+
+        try{
+            return orderRepository.findByClientIdAndStatusIn(uid, statuses);
+        }   catch (Exception e) {
+            log.error("Failed to get orders by user: {} with statuses: {}. Error: {}", uid, statuses.toString(), e.getMessage());
             throw e;
         }
     }

@@ -27,8 +27,14 @@ public class SseService {
 
         emitters.put(orderId, emitter);
 
-        emitter.onCompletion(() -> emitters.remove(orderId));
-        emitter.onTimeout(() -> emitters.remove(orderId));
+        emitter.onCompletion(() -> {
+            log.info("SSE отключён для заказа {}", orderId);
+            emitters.remove(orderId);
+        });
+        emitter.onTimeout(() -> {
+            log.warn("SSE таймаут для заказа {}", orderId);
+            emitters.remove(orderId);
+        });
         emitter.onError((ex) -> emitters.remove(orderId));
 
         // Отправляем сразу текущий статус
