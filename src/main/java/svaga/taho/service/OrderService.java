@@ -240,6 +240,8 @@ public class OrderService {
 
             driverRepository.save(driver);
             orderRepository.save(order);
+            sseService.notifyDriverAboutOrder(driverId, order);
+
 
             log.info("Driver {} successfully assigned to order {}", driverId, orderId);
         } catch (Exception e) {
@@ -262,4 +264,12 @@ public class OrderService {
         }
     }
 
+    public List<Order> getOrdersByDriverIdAndStatuses(String driverId, List<OrderStatus> statuses) {
+        try{
+            return orderRepository.findByDriverIdAndStatusIn(driverId, statuses);
+        }   catch (Exception e) {
+            log.error("Failed to get orders by driver: {} with statuses: {}. Error: {}", driverId, statuses.toString(), e.getMessage());
+            throw e;
+        }
+    }
 }

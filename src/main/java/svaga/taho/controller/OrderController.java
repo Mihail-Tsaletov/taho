@@ -7,12 +7,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import svaga.taho.DTO.DriverOrderResponse;
 import svaga.taho.DTO.OrderResponse;
 import svaga.taho.model.Order;
 import svaga.taho.model.OrderStatus;
+import svaga.taho.model.User;
 import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IUserRepository;
 import svaga.taho.service.OrderService;
+import svaga.taho.service.SseService;
 
 import java.util.List;
 import java.util.Map;
@@ -177,6 +180,52 @@ public class OrderController {
                                         dto.setDriverPhone(driver.getPhoneNumber());
                                     });
                         }
+
+                        return dto;
+                    })
+                    .toList();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Error fetching orders: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/getOrdersByDriverIdWithStatuses")
+    @ResponseBody
+    public ResponseEntity<List<DriverOrderResponse>> getOrdersByDriverIdWithStatuses(@RequestParam("statuses") List<OrderStatus> statuses) {
+        try {
+            String clientId = getCurrentUserUid();
+            User user = userRepository.findById(clientId)
+                    .orElseThrow(() -> new IllegalStateException("User not found"));
+            String driverId = driverRepository.findByUserId(clientId)
+                    .orElseThrow(() -> new IllegalStateException("Driver not found"))
+                    .getDriverId();
+            log.info("Fetching orders for driver {} with statuses: {}", clientId, statuses);
+
+            // Если статусы не переданы — возвращаем все
+            if (statuses == null || statuses.isEmpty()) {
+                statuses = List.of(OrderStatus.values());
+            }
+
+            List<Order> orders = orderService.getOrdersByDriverIdAndStatuses(driverId, statuses);
+
+            // Преобразуем Order + Driver → DriverOrderResponse
+            List<DriverOrderResponse> response = orders.stream()
+                    .map(order -> {
+                        DriverOrderResponse dto = new DriverOrderResponse();
+                        dto.setId(order.getOrderId());
+                        dto.setStartAddress(order.getStartAddress());
+                        dto.setEndAddress(order.getEndAddress());
+                        dto.setStatus(order.getStatus());
+                        dto.setEndPoint(order.getEndPoint());
+                        dto.setStartPoint(order.getStartPoint());
+                        dto.setPassengerName(user.getName());
+                        dto.setPassengerPhone(user.getPhone());
+                        dto.setDistance("");
+                        dto.setPrice("");
 
                         return dto;
                     })

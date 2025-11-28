@@ -28,4 +28,6 @@ public interface IOrderRepository extends JpaRepository<Order, String> {
 
     //Поиск заказов от конкретного пользователя с несколькими статусами(PENDING, ASSIGNED, ACCEPTED)
     List<Order> findByClientIdAndStatusIn(String clientId, List<OrderStatus> statuses);
+
+    List<Order> findByDriverIdAndStatusIn(String driverId, List<OrderStatus> statuses);
 }
