@@ -37,24 +37,7 @@ public class UserService {
     @Transactional
     public User register(RegisterRequest request) {
         if (userRepository.existsByPhone(request.getPhone())) {
-            throw new RuntimeException("Пользователь с таким номером уже существует");  // TO:DO сделать проверку на роль водителя,
-            // чтоб если уже есть юзер, то можно было
-            //зарегать к этой же учетке водилу
-        }
-
-        //Если пользователь регается как водитель уже после создания основной учетки
-        if(request.getRole().equals(UserRole.DRIVER)) {
-            User user = userRepository.findByPhone(request.getPhone()).get(); //Уже существующая запись пользователя
-            Driver driver = new Driver();
-            driver.setStatus(DriverStatus.PENDING);
-            driver.setUserId(user.getId());
-            driver.setName(request.getName());
-            driver.setPhoneNumber(request.getPhone());
-            user.setRole(UserRole.DRIVER);
-            userRepository.save(user);
-            driverRepository.save(driver);
-            log.info("User register as driver with params: {}", driver.toString());
-            return user; //возвращается учетка юзерская
+            throw new RuntimeException("Пользователь с таким номером уже существует");
         }
 
         //Если пользователь регается первый раз
@@ -67,6 +50,32 @@ public class UserService {
         log.info("User register with params: {}", user.toString());
 
         return user;
+    }
+    @Transactional
+    public User registerAsDriver(RegisterRequest request) {
+        if (driverRepository.existsByPhoneNumber(request.getPhone())) {
+            throw new RuntimeException("Пользователь с таким номером уже существует");
+        }
+
+        //Если пользователь регается как водитель уже после создания основной учетки
+        if(request.getRole().equals(UserRole.DRIVER)) {
+            User user = userRepository.findByPhone(request.getPhone()).orElseThrow(() -> {
+                log.error("User {} not found", request.getPhone());
+                return new IllegalStateException("User does not exist for reg as driver");
+            });                                                         //Уже существующая запись пользователя
+            Driver driver = new Driver();
+            driver.setStatus(DriverStatus.PENDING);
+            driver.setUserId(user.getId());
+            driver.setName(request.getName());
+            driver.setPhoneNumber(request.getPhone());
+            user.setRole(UserRole.DRIVER);
+            userRepository.save(user);
+            driverRepository.save(driver);
+            log.info("User register as driver with params: {}", driver.toString());
+            return user; //возвращается учетка юзерская
+        }
+
+        return null;
     }
 
     public User findByPhone(String phone) {

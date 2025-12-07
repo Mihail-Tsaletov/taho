@@ -18,4 +18,6 @@ public interface IDriverRepository extends JpaRepository<Driver, String> {
     Optional<Driver> findByDriverId(String driverId);
 
     Optional<Driver> findByUserId(String uid);
+
+    boolean existsByPhoneNumber(String phone);
 }

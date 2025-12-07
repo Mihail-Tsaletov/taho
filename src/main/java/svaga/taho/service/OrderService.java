@@ -1,9 +1,11 @@
 package svaga.taho.service;
 
 import jakarta.transaction.Transactional;
+import lombok.val;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import svaga.taho.model.*;
 import svaga.taho.repository.IDriverRepository;
@@ -83,8 +85,8 @@ public class OrderService {
             });
 
             if (!DriverStatus.ASSIGNED.equals(driver.getStatus())) {
-                log.error("Driver {} is not available, current status: {}", uid, driver.getStatus());
-                throw new IllegalStateException("Driver is not available");
+                log.error("Driver {} is not ASSIGNED, current status: {}", uid, driver.getStatus());
+                throw new IllegalStateException("Driver is not ASSIGNED");
             }
 
             //Проверка заказа
@@ -160,7 +162,7 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> {
                     log.error("Order {} does not found", orderId);
-                   return new IllegalArgumentException("Order not found");
+                    return new IllegalArgumentException("Order not found");
                 });
 
         if (!Arrays.toString(OrderStatus.values()).contains(order.getStatus().toString())) {
@@ -184,6 +186,7 @@ public class OrderService {
         sseService.sendOrderUpdate(orderId, Map.of(
                 "status", status
         ));
+        log.info("Order status updated with id {} SSE SEND", order.getOrderId());
     }
 
     public Order getCurrentOrder(String orderId) {
@@ -199,7 +202,7 @@ public class OrderService {
     }
 
 
-    public List<Order> getOrdersWithStatus(String status){
+    public List<Order> getOrdersWithStatus(String status) {
         try {
             if (!Arrays.toString(OrderStatus.values()).contains(status)) {
                 log.error("Invalid status {}", status);
@@ -213,7 +216,7 @@ public class OrderService {
         }
     }
 
-    public void putDriverInOrder(String driverId, String orderId){
+    public void putDriverInOrder(String driverId, String orderId) {
         try {
             //Проверка на существование заказа
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
@@ -237,6 +240,7 @@ public class OrderService {
             // Обновляем заказ
             order.setStatus(OrderStatus.ASSIGNED);
             order.setAssignedTime(LocalDateTime.now());
+            order.setDriverId(driver.getDriverId());
 
             driverRepository.save(driver);
             orderRepository.save(order);
@@ -250,25 +254,57 @@ public class OrderService {
         }
     }
 
-    public List<Order> getOrdersByUIDAndStatuses(String uid, List<OrderStatus> statuses){
+    public List<Order> getOrdersByUIDAndStatuses(String uid, List<OrderStatus> statuses) {
         User user = userRepository.findById(uid).orElseThrow(() -> {
             log.error("User {} does not exist", uid);
             return new IllegalStateException("User not found");
         });
 
-        try{
-            return orderRepository.findByClientIdAndStatusIn(uid, statuses);
-        }   catch (Exception e) {
+        try {
+            val byClientIdAndStatusIn = orderRepository.findByClientIdAndStatusIn(uid, statuses);
+            log.info("Orders by client id {} and status {} in {}",uid, statuses, byClientIdAndStatusIn);
+            return byClientIdAndStatusIn;
+        } catch (Exception e) {
             log.error("Failed to get orders by user: {} with statuses: {}. Error: {}", uid, statuses.toString(), e.getMessage());
             throw e;
         }
     }
 
     public List<Order> getOrdersByDriverIdAndStatuses(String driverId, List<OrderStatus> statuses) {
-        try{
-            return orderRepository.findByDriverIdAndStatusIn(driverId, statuses);
-        }   catch (Exception e) {
+        try {
+            val byDriverIdAndStatusIn = orderRepository.findByDriverIdAndStatusIn(driverId, statuses);
+            log.info("Orders by driver id {} and status {} in {}",driverId, statuses, byDriverIdAndStatusIn);
+            return byDriverIdAndStatusIn;
+        } catch (Exception e) {
             log.error("Failed to get orders by driver: {} with statuses: {}. Error: {}", driverId, statuses.toString(), e.getMessage());
+            throw e;
+        }
+    }
+
+    public void orderArrived(String orderId) {
+        try{
+            Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
+                log.error("Order {} not found", orderId);
+                return new IllegalStateException("Order not found");
+            });
+            if (!OrderStatus.ACCEPTED.equals(order.getStatus())) {
+                log.error("Bad status of order {}", order.getStatus());
+                throw new IllegalStateException("Bad status of order");
+            }
+
+            updateOrderStatus(orderId, OrderStatus.COMPLETED);
+            Driver driver = driverRepository.findByDriverId(order.getDriverId()).orElseThrow(() -> {
+                log.error("Driver {} not found", order.getDriverId());
+                return new IllegalStateException("Driver not found");
+            });
+            driver.setStatus(DriverStatus.AVAILABLE);
+            driverRepository.save(driver);
+            sseService.sendOrderUpdate(orderId, Map.of(
+                    "status", OrderStatus.COMPLETED
+            ));
+            log.info("Driver {} end order {}", driver.getDriverId(), orderId);
+        }catch (Exception e) {
+            log.error("Failed to arrived orders with id: {}. Error: {}", orderId, e.getMessage());
             throw e;
         }
     }

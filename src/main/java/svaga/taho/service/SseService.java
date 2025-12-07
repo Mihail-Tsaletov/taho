@@ -65,7 +65,6 @@ public class SseService {
                 );
 
                 emitter.send(SseEmitter.event()
-                        .name("assigned-order")
                         .data(data));
 
                 log.info("Sent new order {} to driver {}", order.getOrderId(), driverId);
@@ -119,7 +118,6 @@ public class SseService {
         if (emitter != null) {
             try {
                 emitter.send(SseEmitter.event()
-                        .name("order-update")
                         .data(data));
                 log.info("Событие отправлено для заказа {}", data);
             } catch (IOException e) {

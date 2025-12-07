@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import svaga.taho.DTO.DriverOrderResponse;
 import svaga.taho.DTO.OrderResponse;
 import svaga.taho.model.Order;
+import svaga.taho.model.Driver;
 import svaga.taho.model.OrderStatus;
 import svaga.taho.model.User;
 import svaga.taho.repository.IDriverRepository;
@@ -35,6 +36,7 @@ public class OrderController {
     private final OrderService orderService;
     private final IUserRepository userRepository;
     private final IDriverRepository driverRepository;
+
 
     public OrderController(OrderService orderService, IUserRepository userRepository, IDriverRepository driverRepository) {
         this.orderService = orderService;
@@ -203,11 +205,11 @@ public class OrderController {
             String driverId = driverRepository.findByUserId(clientId)
                     .orElseThrow(() -> new IllegalStateException("Driver not found"))
                     .getDriverId();
-            log.info("Fetching orders for driver {} with statuses: {}", clientId, statuses);
+            log.info("Fetching orders for driver {} with statuses: {}", driverId, statuses);
 
             // Если статусы не переданы — возвращаем все
             if (statuses == null || statuses.isEmpty()) {
-                statuses = List.of(OrderStatus.values());
+                statuses = List.of(OrderStatus.ASSIGNED, OrderStatus.ACCEPTED, OrderStatus.PICKED_UP);
             }
 
             List<Order> orders = orderService.getOrdersByDriverIdAndStatuses(driverId, statuses);
@@ -239,10 +241,29 @@ public class OrderController {
         }
     }
 
+    @PostMapping("/{id}/arrived")
+    @ResponseBody
+    public ResponseEntity<OrderResponse> orderArrived(@PathVariable("id") String orderId) {
+        try {
+            // Обновляем статус
+            orderService.orderArrived(orderId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Can't arrive order {}", orderId);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     private String getCurrentUserUid() {
         String phone = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByPhone(phone)
                 .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
                 .getId();
+    }
+    private String getDriverId() {
+        String uid = getCurrentUserUid();
+        return driverRepository.findByUserId(uid)
+                .orElseThrow(() -> new IllegalStateException("Driver not found by uid: " + uid))
+                .getDriverId();
     }
 }

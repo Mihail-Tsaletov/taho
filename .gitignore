@@ -40,3 +40,4 @@ build/
 /src/main/resources/application.properties
 /src/main/resources/taho-e7696-firebase-adminsdk-fbsvc-d5ab4f7034.json
 /taho-docker.tar
+/src/main/resources/raw/taho.crt
