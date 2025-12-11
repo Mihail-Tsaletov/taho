@@ -1,5 +1,6 @@
 package svaga.taho.controller;
 
+import jakarta.transaction.Transactional;
 import lombok.val;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,13 +48,16 @@ public class SseController {
         }
     }
 
-    private String getCurrentUserUid() {
+    @Transactional
+    protected String getCurrentUserUid() {
         String phone = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByPhone(phone)
                 .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
                 .getId();
     }
-    private String getDriverId() {
+
+    @Transactional
+    protected String getDriverId() {
         String uid = getCurrentUserUid();
         return driverRepository.findByUserId(uid)
                 .orElseThrow(() -> new IllegalStateException("Driver not found by uid: " + uid))

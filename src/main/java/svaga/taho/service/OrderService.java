@@ -2,6 +2,7 @@ package svaga.taho.service;
 
 import jakarta.transaction.Transactional;
 import lombok.val;
+import org.aspectj.weaver.ast.Or;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -126,37 +127,6 @@ public class OrderService {
         }
     }
 
-/*    public void updateOrder(String orderId, String status) {
-        try {
-            //Проверка заказа
-            Order order = orderRepository.findById(orderId).orElseThrow(() -> {
-                log.error("Order {} does not found", orderId);
-                return new IllegalArgumentException("Order not found");
-            });
-
-            if (!Arrays.toString(OrderStatus.values()).contains(order.getStatus().toString())) {
-                log.error("Invalid status {}", status);
-                throw new IllegalArgumentException("Invalid status");
-            }
-
-            //Обновление времени
-            if (OrderStatus.ACCEPTED.toString().equals(status)) {
-                order.setAcceptanceTime(LocalDateTime.now());
-            } else if (OrderStatus.PICKED_UP.toString().equals(status)) {
-                order.setPickupTime(LocalDateTime.now());
-            } else if (OrderStatus.COMPLETED.toString().equals(status)) {
-                order.setDropOffTime(LocalDateTime.now());
-            }
-
-            order.setStatus(OrderStatus.valueOf(status));
-            orderRepository.save(order);
-            log.info("Order {} updated to status {}", orderId, status);
-        } catch (Exception e) {
-            log.error("Failed to update order: {}", e.getMessage());
-            throw e;
-        }
-    }*/
-
     @Transactional
     public void updateOrderStatus(String orderId, OrderStatus status) {
         Order order = orderRepository.findById(orderId)
@@ -254,6 +224,7 @@ public class OrderService {
         }
     }
 
+    @Transactional
     public List<Order> getOrdersByUIDAndStatuses(String uid, List<OrderStatus> statuses) {
         User user = userRepository.findById(uid).orElseThrow(() -> {
             log.error("User {} does not exist", uid);
@@ -261,7 +232,7 @@ public class OrderService {
         });
 
         try {
-            val byClientIdAndStatusIn = orderRepository.findByClientIdAndStatusIn(uid, statuses);
+            List<Order>  byClientIdAndStatusIn = orderRepository.findByClientIdAndStatusIn(uid, statuses);
             log.info("Orders by client id {} and status {} in {}",uid, statuses, byClientIdAndStatusIn);
             return byClientIdAndStatusIn;
         } catch (Exception e) {
@@ -270,9 +241,10 @@ public class OrderService {
         }
     }
 
+    @Transactional
     public List<Order> getOrdersByDriverIdAndStatuses(String driverId, List<OrderStatus> statuses) {
         try {
-            val byDriverIdAndStatusIn = orderRepository.findByDriverIdAndStatusIn(driverId, statuses);
+            List<Order> byDriverIdAndStatusIn = orderRepository.findByDriverIdAndStatusIn(driverId, statuses);
             log.info("Orders by driver id {} and status {} in {}",driverId, statuses, byDriverIdAndStatusIn);
             return byDriverIdAndStatusIn;
         } catch (Exception e) {

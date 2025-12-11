@@ -78,6 +78,7 @@ public class UserService {
         return null;
     }
 
+    @Transactional
     public User findByPhone(String phone) {
         return userRepository.findByPhone(phone)
                 .orElseThrow(() ->{
@@ -108,6 +109,7 @@ public class UserService {
         }
     }
 
+    @Transactional
     public List<Driver> getFirstFiveDrivers(){
         try {
             return driverRepository.findTop5ByStatus(DriverStatus.AVAILABLE);

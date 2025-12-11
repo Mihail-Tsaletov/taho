@@ -6,6 +6,7 @@ import com.google.cloud.firestore.Firestore;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -108,7 +109,8 @@ public class UserController {
 
     }
 
-    private String getCurrentUserUid() {
+    @Transactional
+    protected String getCurrentUserUid() {
         String phone = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByPhone(phone)
                 .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
