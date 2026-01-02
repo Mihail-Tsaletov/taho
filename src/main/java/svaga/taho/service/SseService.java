@@ -43,31 +43,19 @@ public class SseService {
         emitter.onError((ex) -> driverEmitters.remove(driverId));
 
         log.info("Driver {} connected to SSE", driverId);
+
         return emitter;
     }
 
     // Вызывается из OrderService, когда менеджер назначает заказ водителю
-    public void notifyDriverAboutOrder(String driverId, Order order) {
+    public void notifyDriverAboutOrder(String driverId, Map<String, Object> data) {
         SseEmitter emitter = driverEmitters.get(driverId);
         if (emitter != null) {
             try {
-                Map<String, Object> data = Map.of(
-                        "status", OrderStatus.ASSIGNED,
-                        "id", order.getOrderId(),
-                        "startPoint", order.getStartPoint(),
-                        "endPoint", order.getEndPoint(),
-                        "startAddress", order.getStartAddress(),
-                        "endAddress", order.getEndAddress(),
-                        "passengerName", getClientName(order.getClientId()),
-                        "passengerPhone", getClientPhone(order.getClientId()),
-                        "distance", "2.4 км",
-                        "price", "200"
-                );
-
                 emitter.send(SseEmitter.event()
                         .data(data));
 
-                log.info("Sent new order {} to driver {}", order.getOrderId(), driverId);
+                log.info("Sent new order {} to driver {}", data.get("id"), driverId);
 
             } catch (Exception e) {
                 log.warn("Failed to send to driver {}: {}", driverId, e.getMessage());
@@ -78,22 +66,9 @@ public class SseService {
         }
     }
 
-    private String getClientPhone(String clientId) {
-        return userRepository.findById(clientId)
-                .map(User::getPhone)
-                .orElse("Неизвестно");
-    }
-    private String getClientName(String clientId) {
-        return userRepository.findById(clientId)
-                .map(User::getName)
-                .orElse("Неизвестно");
-    }
-
-
-
     // Клиент подписывается на обновления конкретного заказа
     public SseEmitter subscribeToOrder(@PathVariable String orderId) {
-        SseEmitter emitter = new SseEmitter(0L);
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
         emitters.put(orderId, emitter);
 
@@ -109,6 +84,7 @@ public class SseService {
 
         // Отправляем сразу текущий статус
         log.info("Order {} subscribed", orderId);
+
         return emitter;
     }
 
@@ -125,4 +101,5 @@ public class SseService {
             }
         }
     }
+
 }

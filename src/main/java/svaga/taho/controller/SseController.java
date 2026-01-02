@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IUserRepository;
+import svaga.taho.service.DriverAuthService;
 import svaga.taho.service.SseService;
 
 @RestController
@@ -23,10 +24,12 @@ public class SseController {
     private SseService sseService;
     private final IUserRepository userRepository;
     private final IDriverRepository driverRepository;
+    private final DriverAuthService driverAuthService;
 
-    public SseController(IUserRepository userRepository, IDriverRepository driverRepository) {
+    public SseController(IUserRepository userRepository, IDriverRepository driverRepository, DriverAuthService driverAuthService) {
         this.userRepository = userRepository;
         this.driverRepository = driverRepository;
+        this.driverAuthService = driverAuthService;
     }
 
     @GetMapping(value = "/subscribe/{orderId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -38,29 +41,12 @@ public class SseController {
     @GetMapping(value = "/subscribe/driver", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter driverStream(@RequestHeader("Authorization") String authHeader) {
         try {
-
-        String driverId = getDriverId();
-        log.info("Subscribing to drivers sse by driver {}", driverId);
-        return sseService.subscribeDriver(driverId);}
-        catch (Exception e) {
+            String driverId = driverAuthService.getDriverIdByCurrentUser();
+            log.info("Subscribing to drivers sse by driver {}", driverId);
+            return sseService.subscribeDriver(driverId);
+        } catch (Exception e) {
             log.error("Error while subscribing driver: {}", e.getMessage());
-            return sseService.subscribeDriver(getDriverId());
+            throw new IllegalArgumentException(e);
         }
-    }
-
-    @Transactional
-    protected String getCurrentUserUid() {
-        String phone = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByPhone(phone)
-                .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
-                .getId();
-    }
-
-    @Transactional
-    protected String getDriverId() {
-        String uid = getCurrentUserUid();
-        return driverRepository.findByUserId(uid)
-                .orElseThrow(() -> new IllegalStateException("Driver not found by uid: " + uid))
-                .getDriverId();
     }
 }

@@ -119,7 +119,7 @@ public class UserService {
         }
     }
 
-
+    @Transactional
     public void approveDriver(String driverId) {
         // Проверка: запись водителя существует?
         Driver driver = driverRepository.findById(driverId).orElse(null);

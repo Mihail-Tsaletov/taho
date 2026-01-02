@@ -32,6 +32,7 @@ public class OrderService {
     @Autowired
     private SseService sseService;
 
+    @Transactional
     public String createOrder(Order order, String uid) {
         try {
             //String uid = SecurityContextHolder.getContext().getAuthentication().getName(); Пока коммент, передаем uid как аргумент
@@ -71,7 +72,7 @@ public class OrderService {
             throw e;
         }
     }
-
+    @Transactional
     public void acceptOrder(String orderId, String uid) {
         try {
             if (uid == null) {
@@ -158,7 +159,7 @@ public class OrderService {
         ));
         log.info("Order status updated with id {} SSE SEND", order.getOrderId());
     }
-
+    @Transactional
     public Order getCurrentOrder(String orderId) {
         try {
             return orderRepository.findById(orderId).orElseThrow(() -> {
@@ -171,7 +172,7 @@ public class OrderService {
         }
     }
 
-
+    @Transactional
     public List<Order> getOrdersWithStatus(String status) {
         try {
             if (!Arrays.toString(OrderStatus.values()).contains(status)) {
@@ -186,6 +187,7 @@ public class OrderService {
         }
     }
 
+    @Transactional
     public void putDriverInOrder(String driverId, String orderId) {
         try {
             //Проверка на существование заказа
@@ -212,9 +214,22 @@ public class OrderService {
             order.setAssignedTime(LocalDateTime.now());
             order.setDriverId(driver.getDriverId());
 
+            Map<String, Object> data = Map.of(
+                    "status", OrderStatus.ASSIGNED,
+                    "id", order.getOrderId(),
+                    "startPoint", order.getStartPoint(),
+                    "endPoint", order.getEndPoint(),
+                    "startAddress", order.getStartAddress(),
+                    "endAddress", order.getEndAddress(),
+                    "passengerName", getClientName(order.getClientId()),
+                    "passengerPhone", getClientPhone(order.getClientId()),
+                    "distance", "2.4 км",
+                    "price", "200"
+            );
+
             driverRepository.save(driver);
             orderRepository.save(order);
-            sseService.notifyDriverAboutOrder(driverId, order);
+            sseService.notifyDriverAboutOrder(driverId, data);
 
 
             log.info("Driver {} successfully assigned to order {}", driverId, orderId);
@@ -253,6 +268,7 @@ public class OrderService {
         }
     }
 
+    @Transactional
     public void orderArrived(String orderId) {
         try{
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
@@ -279,5 +295,19 @@ public class OrderService {
             log.error("Failed to arrived orders with id: {}. Error: {}", orderId, e.getMessage());
             throw e;
         }
+    }
+
+    @Transactional
+    public String getClientPhone(String clientId) {
+        return userRepository.findById(clientId)
+                .map(User::getPhone)
+                .orElse("Неизвестно");
+    }
+
+    @Transactional
+    public String getClientName(String clientId) {
+        return userRepository.findById(clientId)
+                .map(User::getName)
+                .orElse("Неизвестно");
     }
 }

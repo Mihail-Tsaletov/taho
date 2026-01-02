@@ -144,10 +144,10 @@ public class OrderController {
             String orderId = request.get("orderId");
 
             orderService.putDriverInOrder(driverId, orderId);
-            log.info("Put driver {} in order with Id: {}", driverId, orderId);
+            log.info("Assigned driver {} in order with Id: {}", driverId, orderId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            log.error("Can't put driver {} in order {} , exception: {}", request.get("driverId"), request.get("orderId"), e.getMessage());
+            log.error("Can't assigned driver {} in order {} , exception: {}", request.get("driverId"), request.get("orderId"), e.getMessage());
             throw e;
         }
     }
