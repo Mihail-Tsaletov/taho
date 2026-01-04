@@ -137,4 +137,9 @@ public class UserService {
         driver.setStatus(DriverStatus.OFFLINE);
         driverRepository.save(driver);
     }
+
+    @Transactional
+    public User getUserById(String uid) {
+        return userRepository.findById(uid).orElse(null);
+    }
 }

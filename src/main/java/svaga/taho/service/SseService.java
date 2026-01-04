@@ -1,29 +1,21 @@
 package svaga.taho.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import svaga.taho.model.Order;
-import svaga.taho.model.OrderStatus;
-import svaga.taho.model.User;
 import svaga.taho.repository.IUserRepository;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 @Slf4j
 @Service
 public class SseService {
     // Хранилище активных соединений: orderId → SseEmitter
-    private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private final Map<String, List<SseEmitter>> orderEmitters = new ConcurrentHashMap<>();
     // Хранилище активных соединений: uid → SseEmitter
     private final ConcurrentHashMap<String, SseEmitter> driverEmitters = new ConcurrentHashMap<>();
 
@@ -70,17 +62,17 @@ public class SseService {
     public SseEmitter subscribeToOrder(@PathVariable String orderId) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
-        emitters.put(orderId, emitter);
+        orderEmitters.computeIfAbsent(orderId, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
         emitter.onCompletion(() -> {
             log.info("SSE отключён для заказа {}", orderId);
-            emitters.remove(orderId);
+            orderEmitters.remove(orderId);
         });
         emitter.onTimeout(() -> {
             log.warn("SSE таймаут для заказа {}", orderId);
-            emitters.remove(orderId);
+            orderEmitters.remove(orderId);
         });
-        emitter.onError((ex) -> emitters.remove(orderId));
+        emitter.onError((ex) -> orderEmitters.remove(orderId));
 
         // Отправляем сразу текущий статус
         log.info("Order {} subscribed", orderId);
@@ -90,14 +82,26 @@ public class SseService {
 
     // Метод для отправки обновлений (вызывается из OrderService)
     public void sendOrderUpdate(String orderId, Map<String, Object> data) {
-        SseEmitter emitter = emitters.get(orderId);
-        if (emitter != null) {
-            try {
-                emitter.send(SseEmitter.event()
-                        .data(data));
-                log.info("Событие отправлено для заказа {}", data);
-            } catch (IOException e) {
-                emitters.remove(orderId);
+        List<SseEmitter> emittersList = orderEmitters.get(orderId);
+
+        if (emittersList != null) {
+            for (SseEmitter emitter : emittersList) {
+                try {
+                    emitter.send(SseEmitter.event().data(data));
+                    log.info("Событие отправлено для заказа {}", data);
+                } catch (IOException e) {
+                    removeEmitter(orderId, emitter);
+                }
+            }
+        }
+    }
+
+    private void removeEmitter(String orderId, SseEmitter emitter) {
+        List<SseEmitter> list = orderEmitters.get(orderId);
+        if (list != null) {
+            list.remove(emitter);  // удаляем именно этот эмиттер
+            if (list.isEmpty()) {
+                orderEmitters.remove(orderId);  // если список пуст — убираем ключ
             }
         }
     }

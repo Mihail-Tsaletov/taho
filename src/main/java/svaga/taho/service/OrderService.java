@@ -144,7 +144,7 @@ public class OrderService {
         //Обновление времени
         if (OrderStatus.ACCEPTED.equals(status)) {
             order.setAcceptanceTime(LocalDateTime.now());
-        } else if (OrderStatus.PICKED_UP.equals(status)) {
+        } else if (OrderStatus.IN_PROGRESS.equals(status)) {
             order.setPickupTime(LocalDateTime.now());
         } else if (OrderStatus.COMPLETED.equals(status)) {
             order.setDropOffTime(LocalDateTime.now());
@@ -280,6 +280,31 @@ public class OrderService {
                 throw new IllegalStateException("Bad status of order");
             }
 
+            updateOrderStatus(orderId, OrderStatus.ARRIVED);
+            Driver driver = driverRepository.findByDriverId(order.getDriverId()).orElseThrow(() -> {
+                log.error("Driver {} not found", order.getDriverId());
+                return new IllegalStateException("Driver not found");
+            });
+            driver.setStatus(DriverStatus.BUSY);
+            driverRepository.save(driver);
+            sseService.sendOrderUpdate(orderId, Map.of(
+                    "status", OrderStatus.ARRIVED
+            ));
+            log.info("Driver {} arrived to order {}", driver.getDriverId(), orderId);
+        }catch (Exception e) {
+            log.error("Failed to arrived orders with id: {}. Error: {}", orderId, e.getMessage());
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void orderComplete(String orderId) {
+        try{
+            Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
+                log.error("Order {} not found", orderId);
+                return new IllegalStateException("Order not found");
+            });
+
             updateOrderStatus(orderId, OrderStatus.COMPLETED);
             Driver driver = driverRepository.findByDriverId(order.getDriverId()).orElseThrow(() -> {
                 log.error("Driver {} not found", order.getDriverId());
@@ -290,12 +315,13 @@ public class OrderService {
             sseService.sendOrderUpdate(orderId, Map.of(
                     "status", OrderStatus.COMPLETED
             ));
-            log.info("Driver {} end order {}", driver.getDriverId(), orderId);
+            log.info("Driver {} complete to order {}", driver.getDriverId(), orderId);
         }catch (Exception e) {
-            log.error("Failed to arrived orders with id: {}. Error: {}", orderId, e.getMessage());
+            log.error("Failed to complete orders with id: {}. Error: {}", orderId, e.getMessage());
             throw e;
         }
     }
+
 
     @Transactional
     public String getClientPhone(String clientId) {

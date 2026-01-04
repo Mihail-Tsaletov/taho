@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseToken;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -107,6 +108,19 @@ public class UserController {
             throw e;
         }
 
+    }
+
+    @GetMapping("/getUser")
+    public ResponseEntity<User> getUser(@RequestHeader("Authorization") String authHeader){
+        try {
+            String uid = getCurrentUserUid();
+            User user = userService.getUserById(uid);
+            log.info("Get user with Id: {}", uid);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            log.error("Error while getting user {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
     }
 
     @Transactional

@@ -18,6 +18,7 @@ import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IUserRepository;
 import svaga.taho.service.OrderService;
 import svaga.taho.service.SseService;
+import svaga.taho.service.UserService;
 
 import java.util.List;
 import java.util.Map;
@@ -37,12 +38,14 @@ public class OrderController {
     private final OrderService orderService;
     private final IUserRepository userRepository;
     private final IDriverRepository driverRepository;
+    private final UserService userService;
 
 
-    public OrderController(OrderService orderService, IUserRepository userRepository, IDriverRepository driverRepository) {
+    public OrderController(OrderService orderService, IUserRepository userRepository, IDriverRepository driverRepository, UserService userService) {
         this.orderService = orderService;
         this.userRepository = userRepository;
         this.driverRepository = driverRepository;
+        this.userService = userService;
     }
 
     @PostMapping
@@ -210,7 +213,7 @@ public class OrderController {
 
             // Если статусы не переданы — возвращаем все
             if (statuses == null || statuses.isEmpty()) {
-                statuses = List.of(OrderStatus.ASSIGNED, OrderStatus.ACCEPTED, OrderStatus.PICKED_UP);
+                statuses = List.of(OrderStatus.ASSIGNED, OrderStatus.ACCEPTED, OrderStatus.IN_PROGRESS);
             }
 
             List<Order> orders = orderService.getOrdersByDriverIdAndStatuses(driverId, statuses);
@@ -251,6 +254,32 @@ public class OrderController {
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Can't arrive order {}", orderId);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/{id}/pickedUp")
+    @ResponseBody
+    public ResponseEntity<OrderResponse> orderPickedUp(@PathVariable("id") String orderId) {
+        try {
+            // Обновляем статус
+            orderService.updateOrderStatus(orderId, OrderStatus.IN_PROGRESS);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Can't arrive order {}", orderId);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/{id}/complete")
+    @ResponseBody
+    public ResponseEntity<OrderResponse> orderComplete(@PathVariable("id") String orderId) {
+        try {
+            // Обновляем статус
+            orderService.orderComplete(orderId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Can't complete order {}", orderId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
