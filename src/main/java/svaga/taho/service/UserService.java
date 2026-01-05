@@ -51,6 +51,7 @@ public class UserService {
 
         return user;
     }
+
     @Transactional
     public User registerAsDriver(RegisterRequest request) {
         if (driverRepository.existsByPhoneNumber(request.getPhone())) {
@@ -58,7 +59,7 @@ public class UserService {
         }
 
         //Если пользователь регается как водитель уже после создания основной учетки
-        if(request.getRole().equals(UserRole.DRIVER)) {
+        if (request.getRole().equals(UserRole.DRIVER)) {
             User user = userRepository.findByPhone(request.getPhone()).orElseThrow(() -> {
                 log.error("User {} not found", request.getPhone());
                 return new IllegalStateException("User does not exist for reg as driver");
@@ -81,13 +82,13 @@ public class UserService {
     @Transactional
     public User findByPhone(String phone) {
         return userRepository.findByPhone(phone)
-                .orElseThrow(() ->{
+                .orElseThrow(() -> {
                     log.error("User with phone number {} dont find", phone);
                     return new RuntimeException();
                 });
     }
 
-    public String createManager(String uid){
+    public String createManager(String uid) {
         try {
             String approvedManagerUid = SecurityContextHolder.getContext().getAuthentication().getName();
             User user = userRepository.findById(uid).orElseThrow(() -> {
@@ -110,7 +111,7 @@ public class UserService {
     }
 
     @Transactional
-    public List<Driver> getFirstFiveDrivers(){
+    public List<Driver> getFirstFiveDrivers() {
         try {
             return driverRepository.findTop5ByStatus(DriverStatus.AVAILABLE);
         } catch (Exception e) {
@@ -140,6 +141,41 @@ public class UserService {
 
     @Transactional
     public User getUserById(String uid) {
-        return userRepository.findById(uid).orElse(null);
+        return userRepository.findById(uid).orElseThrow(() -> {
+            log.error("User {} does not exist", uid);
+            return new IllegalStateException();
+        });
+    }
+
+    @Transactional
+    public Driver getDriverByUId(String uid) {
+        return driverRepository.findByUserId(uid).orElseThrow(() -> {
+            log.error("Driver {} does not exist", uid);
+            return new IllegalStateException();
+        });
+    }
+
+    @Transactional
+    public String getDriverOnLine(String uid) {
+        Driver driver = driverRepository.findByUserId(uid).orElseThrow(() -> {
+            log.error("Driver {} does not exist", uid);
+            return new IllegalStateException();
+        });
+
+        switch (driver.getStatus()) {
+            case AVAILABLE:
+                driver.setStatus(DriverStatus.OFFLINE);
+                driverRepository.save(driver);
+                return driver.getStatus().toString();
+
+            case OFFLINE:
+                driver.setStatus(DriverStatus.AVAILABLE);
+                driverRepository.save(driver);
+                return driver.getStatus().toString();
+
+            default:
+                return driver.getStatus().toString();
+        }
+
     }
 }

@@ -123,6 +123,32 @@ public class UserController {
         }
     }
 
+    @GetMapping("/getDriver")
+    public ResponseEntity<Driver> getDriver(@RequestHeader("Authorization") String authHeader){
+        try {
+            String uid = getCurrentUserUid();
+            Driver driver = userService.getDriverByUId(uid);
+            log.info("Get user with Id: {}", uid);
+            return ResponseEntity.ok(driver);
+        } catch (Exception e) {
+            log.error("Error while getting user {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
+    }
+
+    @PostMapping("/getOnLine") //В зависимости от аргумента либо выход на линию, либо с неё
+    public ResponseEntity<String> getOnLine(@RequestHeader("Authorization") String authHeader){
+        try {
+            String uid = getCurrentUserUid();
+            String driverStatus = userService.getDriverOnLine(uid);
+            log.info("Get driver on line/off line with UId: {}, status {}", uid, driverStatus);
+            return ResponseEntity.ok(driverStatus);
+        } catch (Exception e) {
+            log.error("Error while getting user {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
+    }
+
     @Transactional
     protected String getCurrentUserUid() {
         String phone = SecurityContextHolder.getContext().getAuthentication().getName();
