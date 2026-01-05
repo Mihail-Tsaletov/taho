@@ -16,10 +16,12 @@ import svaga.taho.model.OrderStatus;
 import svaga.taho.model.User;
 import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IUserRepository;
+import svaga.taho.service.DistrictService;
 import svaga.taho.service.OrderService;
 import svaga.taho.service.SseService;
 import svaga.taho.service.UserService;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -38,13 +40,15 @@ public class OrderController {
     private final OrderService orderService;
     private final IUserRepository userRepository;
     private final IDriverRepository driverRepository;
+    private final DistrictService districtService;
     private final UserService userService;
 
 
-    public OrderController(OrderService orderService, IUserRepository userRepository, IDriverRepository driverRepository, UserService userService) {
+    public OrderController(OrderService orderService, IUserRepository userRepository, IDriverRepository driverRepository, DistrictService districtService, UserService userService) {
         this.orderService = orderService;
         this.userRepository = userRepository;
         this.driverRepository = driverRepository;
+        this.districtService = districtService;
         this.userService = userService;
     }
 
@@ -282,6 +286,33 @@ public class OrderController {
             log.error("Can't complete order {}", orderId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    @PostMapping("/calculate-price")
+    public ResponseEntity<Map<String, Object>> calculatePrice(@RequestBody Map<String, String> request) {
+        String startPoint = request.get("startPoint");
+        String endPoint = request.get("endPoint");
+
+        if (startPoint == null || endPoint == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "startPoint и endPoint обязательны"));
+        }
+
+        double price = districtService.calculateMinPrice(startPoint, endPoint);
+
+        String startDistrict = districtService.getDistrictForPoint(
+                districtService.parseLon(startPoint), districtService.parseLat(startPoint));
+        String endDistrict = districtService.getDistrictForPoint(
+                districtService.parseLon(endPoint), districtService.parseLat(endPoint));
+
+        Map<String, Object> response = Map.of(
+                "startPoint", startPoint,
+                "startDistrict", startDistrict,
+                "endPoint", endPoint,
+                "endDistrict", endDistrict,
+                "price", price
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     @Transactional
