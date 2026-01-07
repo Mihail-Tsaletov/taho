@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "drivers")
 @Data
@@ -20,6 +22,9 @@ public class Driver {
 
     @Enumerated(EnumType.STRING)
     private DriverStatus status = DriverStatus.PENDING;
+
+    @Column(name = "balance", nullable = false)
+    private BigDecimal balance = BigDecimal.ZERO;
 
     @PrePersist
     public void generateId() {

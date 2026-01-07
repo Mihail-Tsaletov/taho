@@ -1,5 +1,7 @@
 package svaga.taho.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import lombok.val;
 import org.aspectj.weaver.ast.Or;
@@ -13,6 +15,7 @@ import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IOrderRepository;
 import svaga.taho.repository.IUserRepository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 
@@ -31,6 +34,8 @@ public class OrderService {
     private IDriverRepository driverRepository;
     @Autowired
     private SseService sseService;
+
+    ObjectMapper mapper = new ObjectMapper();
 
     @Transactional
     public String createOrder(Order order, String uid) {
@@ -298,7 +303,7 @@ public class OrderService {
     }
 
     @Transactional
-    public void orderComplete(String orderId) {
+    public void orderComplete(String orderId, String trackJson) throws Exception {
         try{
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
                 log.error("Order {} not found", orderId);
@@ -312,14 +317,52 @@ public class OrderService {
             });
             driver.setStatus(DriverStatus.AVAILABLE);
             driverRepository.save(driver);
+            double price = calculateRealDistance(trackJson);
+            log.info("Km {} complete to order {}", price, orderId);
             sseService.sendOrderUpdate(orderId, Map.of(
-                    "status", OrderStatus.COMPLETED
+                    "status", OrderStatus.COMPLETED,
+                    "km", price                           //Пока km потом в цену переделать
             ));
             log.info("Driver {} complete to order {}", driver.getDriverId(), orderId);
         }catch (Exception e) {
             log.error("Failed to complete orders with id: {}. Error: {}", orderId, e.getMessage());
             throw e;
         }
+    }
+
+    public double calculateRealDistance(String trackJson) throws Exception {
+        JsonNode points = mapper.readTree(trackJson);
+        double totalMeters = 0.0;
+
+        for (int i = 0; i < points.size() - 1; i++) {
+            JsonNode p1 = points.get(i);
+            JsonNode p2 = points.get(i + 1);
+
+            double lon1 = p1.get(0).asDouble();
+            double lat1 = p1.get(1).asDouble();
+            double lon2 = p2.get(0).asDouble();
+            double lat2 = p2.get(1).asDouble();
+
+            totalMeters += haversine(lat1, lon1, lat2, lon2);
+        }
+
+        return totalMeters / 1000.0; // км
+    }
+
+    // Haversine formula (расстояние по прямой между двумя точками)
+    private double haversine(double lat1, double lon1, double lat2, double lon2) {
+        int R = 6371_000; // радиус Земли в метрах
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
     }
 
 

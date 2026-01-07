@@ -277,10 +277,11 @@ public class OrderController {
 
     @PostMapping("/{id}/complete")
     @ResponseBody
-    public ResponseEntity<OrderResponse> orderComplete(@PathVariable("id") String orderId) {
+    public ResponseEntity<OrderResponse> orderComplete(@PathVariable("id") String orderId,
+                                                       @RequestBody String trackJson) {
         try {
             // Обновляем статус
-            orderService.orderComplete(orderId);
+            orderService.orderComplete(orderId, trackJson);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Can't complete order {}", orderId);

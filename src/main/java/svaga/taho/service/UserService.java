@@ -15,6 +15,7 @@ import svaga.taho.repository.IManagerRepository;
 import svaga.taho.repository.IOrderRepository;
 import svaga.taho.repository.IUserRepository;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -177,5 +178,16 @@ public class UserService {
                 return driver.getStatus().toString();
         }
 
+    }
+
+    @Transactional
+    public double monetaNaHodNogi(String driverId, BigDecimal money) {
+        Driver driver = driverRepository.findByDriverId(driverId).orElseThrow(() -> {
+            log.error("Driver {} does not exist", driverId);
+            return new IllegalStateException();
+        });
+        driver.setBalance(driver.getBalance().add(money));
+        driverRepository.save(driver);
+        return driver.getBalance().doubleValue();
     }
 }

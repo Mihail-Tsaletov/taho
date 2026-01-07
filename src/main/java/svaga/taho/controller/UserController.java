@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.transaction.Transactional;
+import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ import svaga.taho.repository.IUserRepository;
 import svaga.taho.service.JwtService;
 import svaga.taho.service.UserService;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -111,7 +113,7 @@ public class UserController {
     }
 
     @GetMapping("/getUser")
-    public ResponseEntity<User> getUser(@RequestHeader("Authorization") String authHeader){
+    public ResponseEntity<User> getUser(@RequestHeader("Authorization") String authHeader) {
         try {
             String uid = getCurrentUserUid();
             User user = userService.getUserById(uid);
@@ -124,7 +126,7 @@ public class UserController {
     }
 
     @GetMapping("/getDriver")
-    public ResponseEntity<Driver> getDriver(@RequestHeader("Authorization") String authHeader){
+    public ResponseEntity<Driver> getDriver(@RequestHeader("Authorization") String authHeader) {
         try {
             String uid = getCurrentUserUid();
             Driver driver = userService.getDriverByUId(uid);
@@ -137,7 +139,7 @@ public class UserController {
     }
 
     @PostMapping("/getOnLine") //В зависимости от аргумента либо выход на линию, либо с неё
-    public ResponseEntity<String> getOnLine(@RequestHeader("Authorization") String authHeader){
+    public ResponseEntity<String> getOnLine(@RequestHeader("Authorization") String authHeader) {
         try {
             String uid = getCurrentUserUid();
             String driverStatus = userService.getDriverOnLine(uid);
