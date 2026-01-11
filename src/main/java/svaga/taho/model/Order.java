@@ -35,8 +35,9 @@ public class Order {
     @Column(name = "end_address")
     private String endAddress;
 
-    private boolean withinCity = true;
     private BigDecimal price;
+
+    private boolean inCity;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status = OrderStatus.PENDING;

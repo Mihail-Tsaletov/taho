@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import svaga.taho.model.*;
+import svaga.taho.repository.IBasePricesRepository;
 import svaga.taho.repository.IDriverRepository;
 import svaga.taho.repository.IOrderRepository;
 import svaga.taho.repository.IUserRepository;
@@ -33,24 +34,24 @@ public class OrderService {
     @Autowired
     private IDriverRepository driverRepository;
     @Autowired
+    private DistrictService districtService;
+    @Autowired
     private SseService sseService;
+    private final IBasePricesRepository basePricesRepository;
 
     ObjectMapper mapper = new ObjectMapper();
+
+    public OrderService(IBasePricesRepository basePricesRepository) {
+        this.basePricesRepository = basePricesRepository;
+    }
 
     @Transactional
     public String createOrder(Order order, String uid) {
         try {
-            //String uid = SecurityContextHolder.getContext().getAuthentication().getName(); Пока коммент, передаем uid как аргумент
             if (uid == null) {
                 log.error("User authentication not found");
                 throw new IllegalStateException("User must be authenticated");
             }
-
-            //Проверка существования юзера
-            User user = userRepository.findById(uid).orElseThrow(() -> {
-                log.error("User {} does not exist", uid);
-                return new IllegalStateException("User not found");
-            });
 
             //Валидация заказа
             if (order.getStartPoint() == null || order.getStartPoint().isEmpty() || order.getEndPoint() == null || order.getEndPoint().isEmpty()) {
@@ -58,15 +59,24 @@ public class OrderService {
                 throw new IllegalArgumentException("Dont have a start point or end point");
             }
 
+            boolean inCity = districtService.isInCity(order.getStartPoint(), order.getEndPoint());
+            log.info("In city: {}", inCity);
+            if (inCity) {
+                order.setPrice(BigDecimal.valueOf(districtService.calculateMinPrice(order.getStartPoint(), order.getEndPoint())));
+            }
+
             //Создание заказа
             order.setClientId(uid);
             order.setStatus(OrderStatus.PENDING);
             order.setOrderTime(LocalDateTime.now());
+            order.setInCity(inCity);
             order.setDriverId(null);
             order.setAcceptanceTime(null);
             order.setAssignedTime(null);
             order.setPickupTime(null);
             order.setDropOffTime(null);
+
+
 
             orderRepository.save(order);
 
@@ -305,6 +315,11 @@ public class OrderService {
     @Transactional
     public void orderComplete(String orderId, String trackJson) throws Exception {
         try{
+            BasePrices basePrices = basePricesRepository.findById(orderId).orElseThrow(() -> {
+                log.error("Base prices {} not found", orderId);
+                return new IllegalStateException("Base prices not found");
+            });
+
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
                 log.error("Order {} not found", orderId);
                 return new IllegalStateException("Order not found");
@@ -317,11 +332,17 @@ public class OrderService {
             });
             driver.setStatus(DriverStatus.AVAILABLE);
             driverRepository.save(driver);
-            double price = calculateRealDistance(trackJson);
-            log.info("Km {} complete to order {}", price, orderId);
+
+            //Вычисление цены поездки по км
+            double distance = districtService.calculateRealDistance(trackJson);
+            BigDecimal price = basePrices.getKilometrePrice().multiply(BigDecimal.valueOf(distance));
+            order.setPrice(price);
+            orderRepository.save(order);
+
+            log.info("Price {} complete to order {}", price, orderId);
             sseService.sendOrderUpdate(orderId, Map.of(
                     "status", OrderStatus.COMPLETED,
-                    "km", price                           //Пока km потом в цену переделать
+                    "price", price
             ));
             log.info("Driver {} complete to order {}", driver.getDriverId(), orderId);
         }catch (Exception e) {
@@ -329,42 +350,6 @@ public class OrderService {
             throw e;
         }
     }
-
-    public double calculateRealDistance(String trackJson) throws Exception {
-        JsonNode points = mapper.readTree(trackJson);
-        double totalMeters = 0.0;
-
-        for (int i = 0; i < points.size() - 1; i++) {
-            JsonNode p1 = points.get(i);
-            JsonNode p2 = points.get(i + 1);
-
-            double lon1 = p1.get(0).asDouble();
-            double lat1 = p1.get(1).asDouble();
-            double lon2 = p2.get(0).asDouble();
-            double lat2 = p2.get(1).asDouble();
-
-            totalMeters += haversine(lat1, lon1, lat2, lon2);
-        }
-
-        return totalMeters / 1000.0; // км
-    }
-
-    // Haversine formula (расстояние по прямой между двумя точками)
-    private double haversine(double lat1, double lon1, double lat2, double lon2) {
-        int R = 6371_000; // радиус Земли в метрах
-
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c;
-    }
-
 
     @Transactional
     public String getClientPhone(String clientId) {

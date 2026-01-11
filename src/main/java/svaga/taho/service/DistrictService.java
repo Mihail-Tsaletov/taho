@@ -10,6 +10,8 @@ import org.locationtech.jts.geom.Polygon;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.core.io.ResourceLoader;
+import svaga.taho.repository.IBasePricesRepository;
+
 import java.io.InputStream;
 import java.util.*;
 
@@ -23,6 +25,11 @@ public class DistrictService {
 
     @Autowired
     private ResourceLoader resourceLoader;
+    private final IBasePricesRepository basePrices;
+
+    public DistrictService(IBasePricesRepository basePrices) {
+        this.basePrices = basePrices;
+    }
 
     @PostConstruct
     public void init() throws Exception {
@@ -62,15 +69,23 @@ public class DistrictService {
         return "Outside";
     }
 
-    // Метод для расчёта минимальной цены
-    public double calculateMinPrice(String startPoint, String endPoint) {
+    public boolean isInCity(String startPoint, String endPoint) {
         String startDistrict = getDistrictForPoint(parseLon(startPoint), parseLat(startPoint));
         String endDistrict = getDistrictForPoint(parseLon(endPoint), parseLat(endPoint));
 
         // Если хотя бы одна точка вне районов — внешняя цена
         if ("Outside".equals(startDistrict) || "Outside".equals(endDistrict)) {
-            return 300.0;
+            return false;
+        } else {
+            return true;
         }
+    }
+
+    // Метод для расчёта минимальной цены
+    // используется только при заказе в города
+    public double calculateMinPrice(String startPoint, String endPoint) {
+        String startDistrict = getDistrictForPoint(parseLon(startPoint), parseLat(startPoint));
+        String endDistrict = getDistrictForPoint(parseLon(endPoint), parseLat(endPoint));
 
         if (startDistrict.equals(endDistrict)) {
             return 100.0; // Внутри района
@@ -81,6 +96,41 @@ public class DistrictService {
         } else {
             return 300.0; // Вне районов или неизвестно
         }
+    }
+
+    public double calculateRealDistance(String trackJson) throws Exception {
+        JsonNode points = mapper.readTree(trackJson);
+        double totalMeters = 0.0;
+
+        for (int i = 0; i < points.size() - 1; i++) {
+            JsonNode p1 = points.get(i);
+            JsonNode p2 = points.get(i + 1);
+
+            double lon1 = p1.get(0).asDouble();
+            double lat1 = p1.get(1).asDouble();
+            double lon2 = p2.get(0).asDouble();
+            double lat2 = p2.get(1).asDouble();
+
+            totalMeters += haversine(lat1, lon1, lat2, lon2);
+        }
+
+        return totalMeters / 1000.0; // км
+    }
+
+    // Haversine formula (расстояние по прямой между двумя точками)
+    private double haversine(double lat1, double lon1, double lat2, double lon2) {
+        int R = 6371_000; // радиус Земли в метрах
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
     }
 
     // Вспомогательные для парсинга "lon, lat"
