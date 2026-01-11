@@ -76,7 +76,7 @@ public class OrderService {
             order.setPickupTime(null);
             order.setDropOffTime(null);
 
-
+            sseService.sendOrderUpdate(order.getOrderId(), Map.of("inCity", inCity));
 
             orderRepository.save(order);
 
