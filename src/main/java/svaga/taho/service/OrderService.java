@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -76,8 +77,6 @@ public class OrderService {
             order.setPickupTime(null);
             order.setDropOffTime(null);
 
-            sseService.sendOrderUpdate(order.getOrderId(), Map.of("inCity", inCity));
-
             orderRepository.save(order);
 
             log.info("Order created with id {}", order.getOrderId());
@@ -87,6 +86,7 @@ public class OrderService {
             throw e;
         }
     }
+
     @Transactional
     public void acceptOrder(String orderId, String uid) {
         try {
@@ -174,6 +174,7 @@ public class OrderService {
         ));
         log.info("Order status updated with id {} SSE SEND", order.getOrderId());
     }
+
     @Transactional
     public Order getCurrentOrder(String orderId) {
         try {
@@ -229,18 +230,18 @@ public class OrderService {
             order.setAssignedTime(LocalDateTime.now());
             order.setDriverId(driver.getDriverId());
 
-            Map<String, Object> data = Map.of(
-                    "status", OrderStatus.ASSIGNED,
-                    "id", order.getOrderId(),
-                    "startPoint", order.getStartPoint(),
-                    "endPoint", order.getEndPoint(),
-                    "startAddress", order.getStartAddress(),
-                    "endAddress", order.getEndAddress(),
-                    "passengerName", getClientName(order.getClientId()),
-                    "passengerPhone", getClientPhone(order.getClientId()),
-                    "distance", "2.4 км",
-                    "price", "200"
-            );
+            Map<String, Object> data = new HashMap<>();
+            data.put("status",       OrderStatus.ASSIGNED);
+            data.put("id",           order.getOrderId());
+            data.put("startPoint",   order.getStartPoint());
+            data.put("endPoint",     order.getEndPoint());
+            data.put("startAddress", order.getStartAddress());
+            data.put("endAddress",   order.getEndAddress());
+            data.put("passengerName", getClientName(order.getClientId()));
+            data.put("passengerPhone", getClientPhone(order.getClientId()));
+            data.put("distance",     "2.4 км");
+            data.put("price",        "200");
+            data.put("inCity",       order.isInCity());
 
             driverRepository.save(driver);
             orderRepository.save(order);
@@ -262,8 +263,8 @@ public class OrderService {
         });
 
         try {
-            List<Order>  byClientIdAndStatusIn = orderRepository.findByClientIdAndStatusIn(uid, statuses);
-            log.info("Orders by client id {} and status {} in {}",uid, statuses, byClientIdAndStatusIn);
+            List<Order> byClientIdAndStatusIn = orderRepository.findByClientIdAndStatusIn(uid, statuses);
+            log.info("Orders by client id {} and status {} in {}", uid, statuses, byClientIdAndStatusIn);
             return byClientIdAndStatusIn;
         } catch (Exception e) {
             log.error("Failed to get orders by user: {} with statuses: {}. Error: {}", uid, statuses.toString(), e.getMessage());
@@ -275,7 +276,7 @@ public class OrderService {
     public List<Order> getOrdersByDriverIdAndStatuses(String driverId, List<OrderStatus> statuses) {
         try {
             List<Order> byDriverIdAndStatusIn = orderRepository.findByDriverIdAndStatusIn(driverId, statuses);
-            log.info("Orders by driver id {} and status {} in {}",driverId, statuses, byDriverIdAndStatusIn);
+            log.info("Orders by driver id {} and status {} in {}", driverId, statuses, byDriverIdAndStatusIn);
             return byDriverIdAndStatusIn;
         } catch (Exception e) {
             log.error("Failed to get orders by driver: {} with statuses: {}. Error: {}", driverId, statuses.toString(), e.getMessage());
@@ -285,7 +286,7 @@ public class OrderService {
 
     @Transactional
     public void orderArrived(String orderId) {
-        try{
+        try {
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
                 log.error("Order {} not found", orderId);
                 return new IllegalStateException("Order not found");
@@ -306,7 +307,7 @@ public class OrderService {
                     "status", OrderStatus.ARRIVED
             ));
             log.info("Driver {} arrived to order {}", driver.getDriverId(), orderId);
-        }catch (Exception e) {
+        } catch (Exception e) {
             log.error("Failed to arrived orders with id: {}. Error: {}", orderId, e.getMessage());
             throw e;
         }
@@ -314,7 +315,9 @@ public class OrderService {
 
     @Transactional
     public void orderComplete(String orderId, String trackJson) throws Exception {
-        try{
+        try {
+            BigDecimal price;
+
             BasePrices basePrices = basePricesRepository.findById(orderId).orElseThrow(() -> {
                 log.error("Base prices {} not found", orderId);
                 return new IllegalStateException("Base prices not found");
@@ -333,11 +336,15 @@ public class OrderService {
             driver.setStatus(DriverStatus.AVAILABLE);
             driverRepository.save(driver);
 
-            //Вычисление цены поездки по км
-            double distance = districtService.calculateRealDistance(trackJson);
-            BigDecimal price = basePrices.getKilometrePrice().multiply(BigDecimal.valueOf(distance));
-            order.setPrice(price);
-            orderRepository.save(order);
+            if (!order.isInCity()) {
+                //Вычисление цены поездки по км
+                double distance = districtService.calculateRealDistance(trackJson);
+                price = basePrices.getKilometrePrice().multiply(BigDecimal.valueOf(distance));
+                order.setPrice(price);
+                orderRepository.save(order);
+            } else {
+                price = order.getPrice();
+            }
 
             log.info("Price {} complete to order {}", price, orderId);
             sseService.sendOrderUpdate(orderId, Map.of(
@@ -345,7 +352,7 @@ public class OrderService {
                     "price", price
             ));
             log.info("Driver {} complete to order {}", driver.getDriverId(), orderId);
-        }catch (Exception e) {
+        } catch (Exception e) {
             log.error("Failed to complete orders with id: {}. Error: {}", orderId, e.getMessage());
             throw e;
         }
