@@ -231,17 +231,17 @@ public class OrderService {
             order.setDriverId(driver.getDriverId());
 
             Map<String, Object> data = new HashMap<>();
-            data.put("status",       OrderStatus.ASSIGNED);
-            data.put("id",           order.getOrderId());
-            data.put("startPoint",   order.getStartPoint());
-            data.put("endPoint",     order.getEndPoint());
+            data.put("status", OrderStatus.ASSIGNED);
+            data.put("id", order.getOrderId());
+            data.put("startPoint", order.getStartPoint());
+            data.put("endPoint", order.getEndPoint());
             data.put("startAddress", order.getStartAddress());
-            data.put("endAddress",   order.getEndAddress());
+            data.put("endAddress", order.getEndAddress());
             data.put("passengerName", getClientName(order.getClientId()));
             data.put("passengerPhone", getClientPhone(order.getClientId()));
-            data.put("distance",     "2.4 км");
-            data.put("price",        "200");
-            data.put("inCity",       order.isInCity());
+            data.put("distance", "2.4 км");
+            data.put("price", "200");
+            data.put("inCity", order.isInCity());
 
             driverRepository.save(driver);
             orderRepository.save(order);
@@ -316,9 +316,7 @@ public class OrderService {
     @Transactional
     public void orderComplete(String orderId, String trackJson) throws Exception {
         try {
-            BigDecimal price;
-
-            BasePrices basePrices = basePricesRepository.findById(orderId).orElseThrow(() -> {
+            BasePrices basePrices = basePricesRepository.findById("1").orElseThrow(() -> {
                 log.error("Base prices {} not found", orderId);
                 return new IllegalStateException("Base prices not found");
             });
@@ -336,14 +334,20 @@ public class OrderService {
             driver.setStatus(DriverStatus.AVAILABLE);
             driverRepository.save(driver);
 
-            if (!order.isInCity()) {
-                //Вычисление цены поездки по км
-                double distance = districtService.calculateRealDistance(trackJson);
-                price = basePrices.getKilometrePrice().multiply(BigDecimal.valueOf(distance));
-                order.setPrice(price);
-                orderRepository.save(order);
-            } else {
-                price = order.getPrice();
+            BigDecimal price;
+            try {
+                if (!order.isInCity()) {
+                    //Вычисление цены поездки по км
+                    double distance = districtService.calculateRealDistance(trackJson);
+                    price = basePrices.getKilometrePrice().multiply(BigDecimal.valueOf(distance));
+                    order.setPrice(price);
+                    orderRepository.save(order);
+                } else {
+                    price = order.getPrice();
+                }
+            } catch (Exception e){
+                log.error("Ошибка обработки суммы поездки. Error: {}", e.getMessage());
+                throw e;
             }
 
             log.info("Price {} complete to order {}", price, orderId);
