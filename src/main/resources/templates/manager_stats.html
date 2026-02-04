@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Панель менеджера Taho</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="h-full bg-gray-100 font-sans antialiased">
+<div x-data="managerApp()" x-init="init()" x-cloak class="h-full flex flex-col">
+
+  <!-- Хедер с вкладками -->
+  <header class="bg-white shadow">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex">
+          <div class="flex-shrink-0 flex items-center">
+            <span class="text-xl font-bold text-indigo-600">Taho Manager</span>
+          </div>
+          <nav class="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <button @click="tab = 'balance'"
+                    :class="{ 'border-indigo-500 text-indigo-600': tab === 'balance', 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700': tab !== 'balance' }"
+                    class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+              Добавление баланса
+            </button>
+            <button @click="tab = 'stats'"
+                    :class="{ 'border-indigo-500 text-indigo-600': tab === 'stats', 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700': tab !== 'stats' }"
+                    class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+              Статистика водителей
+            </button>
+          </nav>
+        </div>
+        <div class="flex items-center">
+          <span class="text-sm text-gray-700">Менеджер: Иван Иванов</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Основной контент -->
+  <main class="flex-1 overflow-auto">
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+
+      <!-- Вкладка "Добавление баланса" -->
+      <div x-show="tab === 'balance'" class="px-4 py-6 sm:px-0">
+        <div class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-medium text-gray-900 mb-6">Пополнение баланса водителю</h2>
+
+          <form @submit.prevent="addBalance">
+            <div class="grid grid-cols-1 gap-6 max-w-md">
+              <div>
+                <label for="phone" class="block text-sm font-medium text-gray-700">Номер телефона водителя</label>
+                <input
+                        x-model="phone"
+                        type="tel"
+                        id="phone"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="+79991234567"
+                        required>
+              </div>
+
+              <div>
+                <label for="amount" class="block text-sm font-medium text-gray-700">Сумма (руб)</label>
+                <input
+                        x-model.number="amount"
+                        type="number"
+                        id="amount"
+                        min="1"
+                        step="1"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="500"
+                        required>
+              </div>
+            </div>
+
+            <div class="mt-8">
+              <button
+                      type="submit"
+                      :disabled="loading || !phone || !amount"
+                      class="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!loading">Пополнить баланс</span>
+                <span x-show="loading">Пополняем...</span>
+              </button>
+            </div>
+
+            <div x-show="successMessage" class="mt-6 text-green-600 text-lg font-medium" x-text="successMessage"></div>
+            <div x-show="errorMessage" class="mt-6 text-red-600 text-lg font-medium" x-text="errorMessage"></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Вкладка "Статистика водителей" -->
+      <div x-show="tab === 'stats'" class="px-4 py-6 sm:px-0">
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+
+          <!-- Список водителей -->
+          <div class="p-6 border-b">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Водители</h2>
+            <div x-show="loadingDrivers" class="text-center py-10 text-gray-500">Загрузка водителей...</div>
+            <div x-show="!loadingDrivers && drivers.length === 0" class="text-center py-10 text-gray-500">Водителей пока нет</div>
+
+            <ul x-show="!loadingDrivers && drivers.length > 0" class="divide-y divide-gray-200">
+              <template x-for="driver in drivers" :key="driver.driverId">
+                <li @click="selectDriver(driver)"
+                    :class="{ 'bg-indigo-50': selectedDriver && selectedDriver.driverId === driver.driverId }"
+                    class="px-4 py-4 sm:px-6 cursor-pointer hover:bg-gray-50 transition">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900" x-text="driver.name || 'Без имени'"></p>
+                      <p class="text-sm text-gray-500" x-text="driver.phoneNumber || 'Нет номера'"></p>
+                    </div>
+                    <div class="text-sm text-gray-500" x-text="(driver.balance || 0).toFixed(2) + ' ₽'"></div>
+                  </div>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- Статистика выбранного водителя -->
+          <div x-show="selectedDriver" class="p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4"
+                x-text="'Заказы водителя: ' + (selectedDriver.name || 'Без имени')"></h3>
+
+            <p class="text-sm text-gray-600 mb-4">
+              Общая сумма по заказам:
+              <span class="font-medium text-gray-900"
+                    x-text="selectedDriverTotal.toFixed(2) + ' ₽'"></span>
+            </p>
+
+            <!-- Сортировка -->
+            <div class="mb-4 flex justify-end">
+              <select x-model="sortOrder"
+                      class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <option value="desc">По новизне (сначала новые)</option>
+                <option value="asc">По старшинству (сначала старые)</option>
+              </select>
+            </div>
+
+            <!-- Список заказов -->
+            <div x-show="loadingOrders" class="text-center py-10 text-gray-500">Загрузка заказов...</div>
+            <div x-show="!loadingOrders && sortedOrders.length === 0" class="text-center py-10 text-gray-500">У водителя пока нет заказов</div>
+
+            <div x-show="!loadingOrders && sortedOrders.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-300">
+                <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Дата</th>
+                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Откуда → Куда</th>
+                  <th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">Цена</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                <template x-for="order in sortedOrders" :key="order.orderId">
+                  <tr class="hover:bg-gray-50">
+                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900"
+                        x-text="formatDate(order.orderTime)"></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"
+                        x-text="order.startAddress + ' → ' + order.endAddress"></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-right text-gray-900 font-medium"
+                        x-text="order.price != null ? order.price.toFixed(2) + ' ₽' : '—'"></td>
+                  </tr>
+                </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div x-show="!selectedDriver && !loadingDrivers" class="p-6 text-center text-gray-500">
+            Выберите водителя из списка
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+  function managerApp() {
+    return {
+      tab: 'stats',
+      phone: '',
+      amount: '',
+      comment: '',
+      loading: false,
+      successMessage: '',
+      errorMessage: '',
+      drivers: [],
+      selectedDriver: null,
+      loadingDrivers: true,
+      loadingOrders: false,
+      sortOrder: 'desc',
+
+      init() {
+        this.loadDrivers();
+      },
+
+      async loadDrivers() {
+        this.loadingDrivers = true;
+        try {
+          const response = await fetch('/api/users/getAllDrivers', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          this.drivers = await response.json();
+        } catch (err) {
+          console.error('Ошибка загрузки водителей:', err);
+          this.errorMessage = 'Не удалось загрузить список водителей';
+        } finally {
+          this.loadingDrivers = false;
+        }
+      },
+
+      get selectedDriverTotal() {
+        if (!this.selectedDriver?.orders) return 0;
+
+        return this.selectedDriver.orders
+                .reduce((sum, order) => {
+                  return sum + (order.price != null && !isNaN(order.price) ? order.price : 0);
+                }, 0);
+      },
+
+      formatDate(dateStr) {
+        if (!dateStr) return '—';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '—';
+        return date.toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      },
+
+      async selectDriver(driver) {
+        this.selectedDriver = driver;
+        this.loadingOrders = true;
+        this.errorMessage = '';
+
+        try {
+          const response = await fetch(`/api/orders/getAllOrdersByDriverId?driverId=${driver.driverId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const orders = await response.json();
+
+          // Сохраняем данные в удобном формате
+          driver.orders = orders.map(o => ({
+            orderId: o.orderId || '—',
+            orderTime: o.orderTime || null,                // ← оригинальная дата ISO
+            startAddress: o.startAddress || '—',
+            endAddress: o.endAddress || '—',
+            price: o.price != null ? Number(o.price) : null // ← число или null
+          }));
+        } catch (err) {
+          console.error('Ошибка загрузки заказов:', err);
+          driver.orders = [];
+          this.errorMessage = 'Не удалось загрузить заказы';
+        } finally {
+          this.loadingOrders = false;
+        }
+      },
+
+      get sortedOrders() {
+        if (!this.selectedDriver?.orders) return [];
+
+        let orders = [...this.selectedDriver.orders];
+
+        return orders.sort((a, b) => {
+          // Если даты отсутствуют — отправляем в конец
+          if (!a.orderTime) return 1;
+          if (!b.orderTime) return -1;
+
+          const dateA = new Date(a.orderTime);
+          const dateB = new Date(b.orderTime);
+
+          // Защита от invalid date
+          if (isNaN(dateA.getTime())) return 1;
+          if (isNaN(dateB.getTime())) return -1;
+
+          return this.sortOrder === 'desc'
+                  ? dateB - dateA
+                  : dateA - dateB;
+        });
+      },
+
+      async addBalance() {
+        if (!this.phone || !this.amount) {
+          this.errorMessage = 'Заполните телефон и сумму';
+          return;
+        }
+
+        this.loading = true;
+        this.successMessage = '';
+        this.errorMessage = '';
+
+        try {
+          const url = `/manager/addBalance?driverPhoneNumber=${encodeURIComponent(this.phone)}&value=${this.amount}`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP ${response.status}`);
+          }
+
+          this.successMessage = `Баланс пополнен на ${this.amount} ₽`;
+          this.phone = '';
+          this.amount = '';
+
+          // Обновляем список водителей, чтобы увидеть новый баланс
+          await this.loadDrivers();
+
+        } catch (err) {
+          console.error(err);
+          this.errorMessage = err.message || 'Ошибка пополнения баланса';
+        } finally {
+          this.loading = false;
+        }
+      }
+    }
+  }
+</script>
+</body>
+</html>

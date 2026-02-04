@@ -29,12 +29,17 @@ public class ManagerController {
         return "assign_orders";
     }
 
+    @GetMapping("/stat")
+    public String Stats(Model model) {
+        return "manager_stats";
+    }
+
     @PostMapping("/addBalance")
-    public ResponseEntity<String> addBalance(@RequestParam("driverId") String driverId,
+    public ResponseEntity<String> addBalance(@RequestParam("driverPhoneNumber") String driverPhoneNumber,
                                              @RequestParam("value") String value) {
         try {
-            double balance = userService.monetaNaHodNogi(driverId, BigDecimal.valueOf(Double.parseDouble(value)));
-            log.info("Add money on balance to driver: {}, balance {}", driverId, balance);
+            double balance = userService.monetaNaHodNogi(driverPhoneNumber, BigDecimal.valueOf(Double.parseDouble(value)));
+            log.info("Add money on balance to driver: {}, balance {}", driverPhoneNumber, balance);
             return ResponseEntity.ok(String.valueOf(balance));
         } catch (Exception e) {
             log.error("Error while add balance to driver {}", e.getMessage());

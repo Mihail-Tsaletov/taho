@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import svaga.taho.DTO.OrderWeb;
 import svaga.taho.model.*;
 import svaga.taho.repository.IBasePricesRepository;
 import svaga.taho.repository.IDriverRepository;
@@ -20,10 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class OrderService {
@@ -358,6 +356,28 @@ public class OrderService {
             log.info("Driver {} complete to order {}", driver.getDriverId(), orderId);
         } catch (Exception e) {
             log.error("Failed to complete orders with id: {}. Error: {}", orderId, e.getMessage());
+            throw e;
+        }
+    }
+
+    @Transactional
+    public List<OrderWeb> getAllOrdersByDriverId(String driverId) {
+        try{
+            List<Order> allByDriverId = orderRepository.findAllByDriverId(driverId);
+            List<OrderWeb> webs = new ArrayList<>();
+            for (Order order : allByDriverId) {
+                OrderWeb orderWeb = new OrderWeb();
+                orderWeb.setOrderId(order.getOrderId());
+                orderWeb.setOrderTime(order.getOrderTime());
+                orderWeb.setEndAddress(order.getEndAddress());
+                orderWeb.setStartAddress(order.getStartAddress());
+                orderWeb.setPrice(order.getPrice());
+                webs.add(orderWeb);
+            }
+            log.info("Complete find all orders by driver id {}", driverId);
+            return webs;
+        }catch (Exception e) {
+            log.error("Failed to complete fetch orders with driverId: {}. Error: {}", driverId, e.getMessage());
             throw e;
         }
     }

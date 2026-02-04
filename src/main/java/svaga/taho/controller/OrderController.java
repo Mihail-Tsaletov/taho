@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import svaga.taho.DTO.DriverOrderResponse;
 import svaga.taho.DTO.OrderResponse;
+import svaga.taho.DTO.OrderWeb;
 import svaga.taho.model.Order;
 import svaga.taho.model.Driver;
 import svaga.taho.model.OrderStatus;
@@ -249,6 +250,17 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/getAllOrdersByDriverId")
+    @ResponseBody
+    public List<OrderWeb> getOrdersByDriverIdWithStatuses(@RequestParam("driverId") String driverId) {
+        try {
+            return orderService.getAllOrdersByDriverId(driverId);
+        }catch (Exception e) {
+            log.error("Error getting orders: {}", e.getMessage());
+            throw e;
+        }
+    }
+
     @PostMapping("/{id}/arrived")
     @ResponseBody
     public ResponseEntity<OrderResponse> orderArrived(@PathVariable("id") String orderId) {
@@ -323,6 +335,7 @@ public class OrderController {
                 .orElseThrow(() -> new IllegalStateException("User not found by phone: " + phone))
                 .getId();
     }
+
     @Transactional
     protected String getDriverId() {
         String uid = getCurrentUserUid();

@@ -181,13 +181,17 @@ public class UserService {
     }
 
     @Transactional
-    public double monetaNaHodNogi(String driverId, BigDecimal money) {
-        Driver driver = driverRepository.findByDriverId(driverId).orElseThrow(() -> {
-            log.error("Driver {} does not exist", driverId);
+    public double monetaNaHodNogi(String driverPhoneNumber, BigDecimal money) {
+        Driver driver = driverRepository.findByPhoneNumber(driverPhoneNumber).orElseThrow(() -> {
+            log.error("Driver {} does not exist", driverPhoneNumber);
             return new IllegalStateException();
         });
         driver.setBalance(driver.getBalance().add(money));
         driverRepository.save(driver);
         return driver.getBalance().doubleValue();
+    }
+
+    public List<Driver> getAllDrivers() {
+        return driverRepository.findAll();
     }
 }

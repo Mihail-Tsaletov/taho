@@ -38,6 +38,19 @@ public class SecurityConfig {
                         .requestMatchers("/manager").permitAll()
                         .requestMatchers("api/**").permitAll()
                         .anyRequest().permitAll())
+                .formLogin(form -> form
+                        .loginPage("/login")                    // Кастомная страница логина
+                        .loginProcessingUrl("/login")           // POST сюда отправляет форму (по умолчанию)
+                        .defaultSuccessUrl("/manager/orders", true)  // После входа — в ожидающие
+                        .permitAll()
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
+                        .permitAll()
+                )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -112,6 +112,19 @@ public class UserController {
 
     }
 
+    //Возвращает всех водителей
+    @GetMapping("/getAllDrivers")
+    @ResponseBody
+    public List<Driver> getAllDrivers() throws ExecutionException, InterruptedException {
+        try {
+            return userService.getAllDrivers();
+        } catch (Exception e) {
+            log.error("Can't get all drivers, exception: {}", e.getMessage());
+            throw e;
+        }
+
+    }
+
     @GetMapping("/getUser")
     public ResponseEntity<User> getUser(@RequestHeader("Authorization") String authHeader) {
         try {
