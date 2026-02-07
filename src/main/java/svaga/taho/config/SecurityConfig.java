@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -13,6 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import svaga.taho.model.UserRole;
+import svaga.taho.service.JpaUserDetailsService;
 import svaga.taho.service.JwtService;
 
 import javax.sql.DataSource;
@@ -35,10 +38,23 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/manager").permitAll()
-                        .requestMatchers("api/**").permitAll()
-                        .anyRequest().permitAll())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        .requestMatchers("/manager/**").hasRole(UserRole.MANAGER.name())
+                        .requestMatchers("api/auth/**").permitAll()
+                        .anyRequest().authenticated())
+
+                .formLogin(form -> form
+                        .loginPage("/login")                     // GET — страница с формой
+                        .loginProcessingUrl("/perform_login")    // POST сюда пойдёт форма
+                        .defaultSuccessUrl("/manager/stat", true)     // куда редирект после успеха
+                        .failureUrl("/login?error=true")         // при ошибке
+                        .permitAll()
+                )
+
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout")
+                        .permitAll()
+                )
                 .addFilterBefore(jwtFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -49,9 +65,16 @@ public class SecurityConfig {
     }
 
     @Bean
+    public UserDetailsService userDetailsService(JpaUserDetailsService impl) {
+        return impl;
+    }
+
+/*
+    @Bean
     public UserDetailsService userDetailsService(DataSource dataSource) {
         return new JdbcUserDetailsManager(dataSource);
     }
+*/
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {

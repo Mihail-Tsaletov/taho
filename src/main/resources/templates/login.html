@@ -16,7 +16,7 @@
 <body>
 <div class="login-container">
   <h2>Админ-панель Taho</h2>
-  <form th:action="@{/login}" method="post">
+  <form th:action="@{/perform_login}" method="post">
     <input type="text" name="username" placeholder="Номер телефона" required autofocus />
     <input type="password" name="password" placeholder="Пароль" required />
     <div class="error" th:if="${param.error}">Неверный логин или пароль</div>

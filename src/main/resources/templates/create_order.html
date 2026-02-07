@@ -1,27 +1,292 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" class="h-full" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Создание заказа</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель менеджера Taho</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
-<body>
-<div class="container">
-    <h1>Создание нового заказа</h1>
-    <div class="form-container">
-        <form>
-            <label for="phone">Телефон пользователя:</label>
-            <input type="tel" id="phone" placeholder="Введите номер телефона">
+<body class="h-full bg-gray-100 font-sans antialiased">
+<div x-data="managerApp()" x-init="init()" x-cloak class="h-full flex flex-col">
 
-            <label for="start">Начальная точка:</label>
-            <input type="text" id="start" placeholder="Адрес начала поездки">
+    <!-- Хедер с вкладками -->
+    <header class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <span class="text-xl font-bold text-indigo-600">Taho Manager</span>
+                    </div>
+                    <nav class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <button @click="tab = 'balance'"
+                                :class="{ 'border-indigo-500 text-indigo-600': tab === 'balance', 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700': tab !== 'balance' }"
+                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Добавление баланса
+                        </button>
+                        <button @click="tab = 'stats'"
+                                :class="{ 'border-indigo-500 text-indigo-600': tab === 'stats', 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700': tab !== 'stats' }"
+                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Статистика водителей
+                        </button>
+                        <button @click="tab = 'assign'"
+                                :class="{ 'border-indigo-500 text-indigo-600': tab === 'assign', 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700': tab !== 'assign' }"
+                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Назначение заказов
+                        </button>
+                    </nav>
+                </div>
+                <div class="flex items-center" th:if="${currentUserName}">
+                    <span class="text-sm font-medium text-gray-700 mr-2">Менеджер:</span>
+                    <span class="text-sm text-indigo-700 font-semibold" th:text="${currentUserName}"></span>
+                </div>
+            </div>
+        </div>
+    </header>
 
-            <label for="end">Конечная точка:</label>
-            <input type="text" id="end" placeholder="Адрес окончания поездки">
+    <!-- Основной контент -->
+    <main class="flex-1 overflow-auto">
+        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
 
-            <button type="submit">Создать заказ</button>
-        </form>
-    </div>
+            <!-- Вкладка "Добавление баланса" -->
+            <div x-show="tab === 'balance'" class="px-4 py-6 sm:px-0">
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-6">Пополнение баланса водителю</h2>
+
+                    <form @submit.prevent="addBalance">
+                        <div class="grid grid-cols-1 gap-6 max-w-md">
+                            <div>
+                                <label for="phone" class="block text-sm font-medium text-gray-700">Номер телефона водителя</label>
+                                <input
+                                        x-model="phone"
+                                        type="tel"
+                                        id="phone"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        placeholder="+79991234567"
+                                        required>
+                            </div>
+
+                            <div>
+                                <label for="amount" class="block text-sm font-medium text-gray-700">Сумма (руб)</label>
+                                <input
+                                        x-model.number="amount"
+                                        type="number"
+                                        id="amount"
+                                        min="1"
+                                        step="1"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        placeholder="500"
+                                        required>
+                            </div>
+                        </div>
+
+                        <div class="mt-8">
+                            <button
+                                    type="submit"
+                                    :disabled="loading || !phone || !amount"
+                                    class="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!loading">Пополнить баланс</span>
+                                <span x-show="loading">Пополняем...</span>
+                            </button>
+                        </div>
+
+                        <div x-show="successMessage" class="mt-6 text-green-600 text-lg font-medium" x-text="successMessage"></div>
+                        <div x-show="errorMessage" class="mt-6 text-red-600 text-lg font-medium" x-text="errorMessage"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Вкладка "Статистика водителей" → оставляем как было -->
+            <div x-show="tab === 'stats'" class="px-4 py-6 sm:px-0">
+                <!-- ... твой текущий код вкладки stats без изменений ... -->
+            </div>
+
+            <!-- НОВАЯ ВКЛАДКА "Назначение заказов" -->
+            <div x-show="tab === 'assign'" class="px-4 py-6 sm:px-0">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Левая колонка: Новые заказы (PENDING) -->
+                    <div class="bg-white shadow rounded-lg overflow-hidden">
+                        <div class="p-6 border-b">
+                            <h2 class="text-lg font-medium text-gray-900">
+                                Новые заказы
+                                <span class="text-green-600" x-text="'(' + pendingOrders.length + ')'"></span>
+                            </h2>
+                        </div>
+                        <div class="p-6">
+                            <div x-show="loadingOrders" class="text-center py-10 text-gray-500">Загрузка заказов...</div>
+                            <div x-show="!loadingOrders && pendingOrders.length === 0"
+                                 class="text-center py-10 text-gray-500">Нет заказов для назначения</div>
+                            <div x-show="!loadingOrders && pendingOrders.length > 0" class="space-y-4">
+                                <template x-for="order in pendingOrders" :key="order.orderId">
+                                    <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <p class="font-medium text-gray-900">Заказ #<span x-text="order.orderId"></span></p>
+                                                <p class="text-sm text-gray-500" x-text="formatDate(order.orderTime)"></p>
+                                            </div>
+                                            <p class="text-sm font-medium text-gray-900" x-text="order.price != null ? order.price.toFixed(2) + ' ₽' : '—'"></p>
+                                        </div>
+                                        <p class="text-gray-700 mb-3">
+                                            <strong>Откуда:</strong> <span x-text="order.startAddress"></span><br>
+                                            <strong>Куда:</strong> <span x-text="order.endAddress"></span>
+                                        </p>
+                                        <select x-model="selectedDrivers[order.orderId]" @change="assignDriver(order.orderId)"
+                                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            <option value="">— Выберите водителя —</option>
+                                            <template x-for="driver in availableDrivers" :key="driver.driverId">
+                                                <option :value="driver.driverId" x-text="driver.name + ' (' + driver.phone + ')'"></option>
+                                            </template>
+                                        </select>
+                                        <div x-show="assignmentMessages[order.orderId]" class="mt-3 text-sm font-medium"
+                                             :class="assignmentMessages[order.orderId].success ? 'text-green-600' : 'text-red-600'"
+                                             x-text="assignmentMessages[order.orderId].text"></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Правая колонка: Доступные водители -->
+                    <div class="bg-white shadow rounded-lg overflow-hidden">
+                        <div class="p-6 border-b">
+                            <h2 class="text-lg font-medium text-gray-900">
+                                Доступные водители
+                                <span class="text-green-600" x-text="'(' + availableDrivers.length + ')'"></span>
+                            </h2>
+                        </div>
+                        <div class="p-6">
+                            <div x-show="loadingDrivers" class="text-center py-10 text-gray-500">Загрузка водителей...</div>
+                            <div x-show="!loadingDrivers && availableDrivers.length === 0"
+                                 class="text-center py-10 text-gray-500">Нет доступных водителей</div>
+                            <div x-show="!loadingDrivers && availableDrivers.length > 0" class="space-y-4">
+                                <template x-for="driver in availableDrivers" :key="driver.driverId">
+                                    <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+                                        <p class="font-medium text-gray-900" x-text="driver.name || 'Без имени'"></p>
+                                        <p class="text-sm text-gray-600">Телефон: <span x-text="driver.phone || '—'"></span></p>
+                                        <p class="text-sm text-gray-600">Авто: <span x-text="driver.carModel || '—'"></span> (<span x-text="driver.carNumber || '—'"></span>)</p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
 </div>
+
+<script>
+    function managerApp() {
+        return {
+            tab: 'stats',  // дефолтная вкладка
+            // ... все твои существующие свойства (phone, amount, drivers, selectedDriver и т.д.) ...
+
+            // Новые свойства для вкладки "Назначение заказов"
+            pendingOrders: [],
+            availableDrivers: [],
+            loadingOrders: false,
+            loadingDrivers: false,
+            selectedDrivers: {},          // { orderId: driverId }
+            assignmentMessages: {},       // { orderId: { text: '...', success: true/false } }
+
+            init() {
+                // твои существующие init-вызовы
+                this.loadDrivers();     // если уже есть для stats
+                // для новой вкладки загружаем при переключении или здесь
+            },
+
+            // Переопределяем/добавляем методы загрузки для новой вкладки
+            async loadPendingOrders() {
+                this.loadingOrders = true;
+                try {
+                    const response = await fetch('/api/orders/getOrdersWithStatus?status=PENDING', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (!response.ok) throw new Error('Ошибка загрузки заказов');
+                    this.pendingOrders = await response.json();
+                } catch (err) {
+                    console.error(err);
+                    // можно добавить errorMessage
+                } finally {
+                    this.loadingOrders = false;
+                }
+            },
+
+            async loadAvailableDrivers() {
+                this.loadingDrivers = true;
+                try {
+                    const response = await fetch('/api/users/getAvailableDrivers', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (!response.ok) throw new Error('Ошибка загрузки водителей');
+                    this.availableDrivers = await response.json();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    this.loadingDrivers = false;
+                }
+            },
+
+            async assignDriver(orderId) {
+                const driverId = this.selectedDrivers[orderId];
+                if (!driverId) return;
+
+                this.assignmentMessages[orderId] = { text: 'Назначаем...', success: false };
+
+                try {
+                    const response = await fetch('/api/orders/putDriverInOrder', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId: orderId, driverId: driverId })
+                    });
+
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(errText || 'Ошибка сервера');
+                    }
+
+                    this.assignmentMessages[orderId] = { text: 'Водитель назначен!', success: true };
+
+                    // Убираем заказ из списка через 1.5 секунды
+                    setTimeout(() => {
+                        this.pendingOrders = this.pendingOrders.filter(o => o.orderId !== orderId);
+                        delete this.selectedDrivers[orderId];
+                        delete this.assignmentMessages[orderId];
+                    }, 1500);
+
+                } catch (err) {
+                    console.error(err);
+                    this.assignmentMessages[orderId] = { text: 'Ошибка: ' + err.message, success: false };
+                }
+            },
+
+            formatDate(dateStr) {
+                if (!dateStr) return '—';
+                const date = new Date(dateStr);  // предполагаем ISO или seconds → адаптируй если нужно
+                if (isNaN(date.getTime())) return '—';
+                return date.toLocaleString('ru-RU', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            },
+
+            // Вызов при переключении на вкладку assign (опционально, можно в @click)
+            // Но для простоты можно вызывать в x-init или отдельно
+            // Лучше добавить watcher или метод
+            $watch('tab', (newTab) => {
+            if (newTab === 'assign') {
+                this.loadPendingOrders();
+                this.loadAvailableDrivers();
+            }
+        })
+    }
+    }
+</script>
 </body>
 </html>
