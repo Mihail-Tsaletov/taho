@@ -330,6 +330,8 @@ public class OrderService {
                 return new IllegalStateException("Driver not found");
             });
             driver.setStatus(DriverStatus.AVAILABLE);
+            BigDecimal balance = driver.getBalance();
+            driver.setBalance(balance.subtract(BigDecimal.valueOf(25)));
             driverRepository.save(driver);
 
             BigDecimal price;
