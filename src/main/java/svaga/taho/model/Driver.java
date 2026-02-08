@@ -26,6 +26,9 @@ public class Driver {
     @Column(name = "balance", nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
+    @Column(name = "last_district")
+    private String lastDistrict;
+
     @PrePersist
     public void generateId() {
         if (this.driverId == null) {

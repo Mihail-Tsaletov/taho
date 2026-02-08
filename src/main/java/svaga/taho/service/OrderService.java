@@ -104,6 +104,11 @@ public class OrderService {
                 throw new IllegalStateException("Driver is not ASSIGNED");
             }
 
+/*            if ((0 < (driver.getBalance().compareTo(BigDecimal.valueOf(25))))) {
+                log.error("Driver {} don't have enough balance to take order: {}", uid, driver.getBalance());
+                throw new IllegalStateException("Driver don't have enough balance");
+            }*/
+
             //Проверка заказа
             Order order = orderRepository.findByOrderId(orderId).orElseThrow(() -> {
                 log.error("Order {} does not exist", orderId);
@@ -123,6 +128,10 @@ public class OrderService {
 
             //Обновление статуса водителя
             driver.setStatus(DriverStatus.BUSY);
+            String districtForPoint = districtService.getDistrictForPoint(districtService.parseLon(order.getEndPoint()),
+                    districtService.parseLat(order.getEndPoint()));
+            log.info("Order district {} ", districtForPoint);
+            driver.setLastDistrict(districtForPoint);
 
             driverRepository.save(driver);
             orderRepository.save(order);
@@ -324,14 +333,19 @@ public class OrderService {
                 return new IllegalStateException("Order not found");
             });
 
+            if (OrderStatus.COMPLETED.equals(order.getStatus())) {
+                log.error("Order {} already completed!", orderId);
+                throw new IllegalStateException("Order already completed!");
+            }
+
             updateOrderStatus(orderId, OrderStatus.COMPLETED);
             Driver driver = driverRepository.findByDriverId(order.getDriverId()).orElseThrow(() -> {
                 log.error("Driver {} not found", order.getDriverId());
                 return new IllegalStateException("Driver not found");
             });
             driver.setStatus(DriverStatus.AVAILABLE);
-            BigDecimal balance = driver.getBalance();
-            driver.setBalance(balance.subtract(BigDecimal.valueOf(25)));
+            BigDecimal balance = driver.getBalance().subtract(BigDecimal.valueOf(25));
+            driver.setBalance(balance);
             driverRepository.save(driver);
 
             BigDecimal price;
@@ -353,7 +367,8 @@ public class OrderService {
             log.info("Price {} complete to order {}", price, orderId);
             sseService.sendOrderUpdate(orderId, Map.of(
                     "status", OrderStatus.COMPLETED,
-                    "price", price
+                    "price", price,
+                    "balance", balance
             ));
             log.info("Driver {} complete to order {}", driver.getDriverId(), orderId);
         } catch (Exception e) {

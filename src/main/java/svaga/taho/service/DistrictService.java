@@ -82,7 +82,7 @@ public class DistrictService {
     }
 
     // Метод для расчёта минимальной цены
-    // используется только при заказе в города
+    // используется только при заказе в городе
     public double calculateMinPrice(String startPoint, String endPoint) {
         String startDistrict = getDistrictForPoint(parseLon(startPoint), parseLat(startPoint));
         String endDistrict = getDistrictForPoint(parseLon(endPoint), parseLat(endPoint));
